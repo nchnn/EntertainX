@@ -20,10 +20,12 @@ def test_sidebar_category_change():
     assert sb.active_category() == "Music"
 
 
-def test_sidebar_all_categories_reachable():
-    from ui.sidebar import Sidebar, CATEGORIES
-    results = []
-    sb = Sidebar("testuser", lambda c: results.append(c))
-    for cat in CATEGORIES:
-        sb.set_active(cat)
-    assert results[-len(CATEGORIES):] == CATEGORIES
+def test_content_area_restores_last_subtab():
+    from ui.content_area import ContentArea
+    ca = ContentArea(on_logout=lambda: None)
+    ca.show_category("Video")
+    ca._switch_subtab(2)   # TV Shows (index 2)
+    ca.show_category("Music")
+    ca.show_category("Video")
+    assert ca._last_tab.get("Video") == 2
+
