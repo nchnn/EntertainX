@@ -11,6 +11,7 @@ from ui.components.music_card import (
     duration_ms,
     format_duration,
 )
+from ui.pages.music import MusicPage
 from ui.pages.sample_data import ALBUMS
 
 
@@ -109,3 +110,28 @@ def test_missing_length_uses_three_minutes(app, length):
 
 def test_every_album_has_a_valid_length():
     assert all(re.fullmatch(r"\d+:\d{2}", album["length"]) for album in ALBUMS)
+
+
+def test_music_page_uses_player_cards(app):
+    page = MusicPage()
+    assert len(page.grid.cards) == len(ALBUMS)
+    assert all(isinstance(card, MusicPlayerCard) for card in page.grid.cards)
+    assert page.grid.cards[0].title == ALBUMS[0]["title"]
+
+
+def test_starting_one_card_pauses_the_others(app):
+    page = MusicPage()
+    first, second = page.grid.cards[0], page.grid.cards[1]
+    first.toggle()
+    assert first.is_playing()
+
+    second.toggle()
+    assert second.is_playing()
+    assert not first.is_playing()
+
+
+def test_filtering_out_a_playing_card_pauses_it(app):
+    page = MusicPage()
+    page.grid.cards[0].toggle()
+    page.search.setText("Pink Hours")
+    assert not page.grid.cards[0].is_playing()
