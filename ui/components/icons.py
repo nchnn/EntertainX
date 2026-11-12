@@ -39,6 +39,7 @@ _SLUGS = {
     "eye-off": "eye-off",
     "search": "search",
     "play": "play",
+    "pause": "pause",
     "star": "star",
     "plus": "plus",
     "chevron": "chevron-right",
