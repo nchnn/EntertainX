@@ -22,7 +22,7 @@ def test_sidebar_category_change():
 
 def test_content_area_restores_last_subtab():
     from ui.content_area import ContentArea
-    ca = ContentArea(on_logout=lambda: None)
+    ca = ContentArea()
     ca.show_category("Video")
     ca._switch_subtab(2)   # TV Shows (index 2)
     ca.show_category("Music")
@@ -42,25 +42,62 @@ def test_sidebar_marks_active_button():
 
 
 def test_sidebar_logout_calls_callback():
-    from PySide6.QtWidgets import QPushButton
-
     from ui.sidebar import Sidebar
 
     logged_out = []
     sb = Sidebar("testuser", lambda c: None, on_logout=lambda: logged_out.append(True))
-    buttons = [b for b in sb.findChildren(QPushButton) if "Log out" in b.text()]
-    assert buttons
-    buttons[0].click()
+    assert sb.logout_button is not None
+    assert sb.logout_button.toolTip() == "Log out"
+    assert sb.logout_button.accessibleName() == "Log out"
+    sb.logout_button.click()
     assert logged_out == [True]
+
+
+def test_sidebar_has_no_duplicate_branding():
+    """Branding lives in the title bar only, never in the navigation rail."""
+    from PySide6.QtWidgets import QLabel
+
+    from ui.sidebar import Sidebar
+
+    sb = Sidebar("testuser", lambda c: None)
+    brand_labels = [
+        child for child in sb.findChildren(QLabel)
+        if child.property("role") == "brand"
+    ]
+    assert brand_labels == []
+    texts = [child.text() for child in sb.findChildren(QLabel)]
+    assert "EntertainX" not in texts
+
+
+def test_sidebar_anchors_profile_and_logout_together():
+    from ui.sidebar import Sidebar
+
+    sb = Sidebar("testuser", lambda c: None, on_logout=lambda: None)
+    footer = sb.profile_section
+    assert footer.isAncestorOf(sb.username_label)
+    assert footer.isAncestorOf(sb.status_label)
+    assert footer.isAncestorOf(sb.logout_button)
+
+
+def test_sidebar_profile_elides_long_usernames():
+    from PySide6.QtWidgets import QSizePolicy
+
+    from ui.sidebar import Sidebar
+
+    long_name = "a-very-long-display-name-that-would-push-the-button"
+    sb = Sidebar(long_name, lambda c: None, on_logout=lambda: None)
+    assert sb.username_label.text() == long_name
+    policy = sb.username_label.sizePolicy().horizontalPolicy()
+    assert policy == QSizePolicy.Policy.Ignored
 
 
 def test_content_area_switches_pages_and_tabs():
     from ui.content_area import ContentArea
 
-    ca = ContentArea(on_logout=lambda: None)
+    ca = ContentArea()
     ca.show_category("Music")
     assert ca.current_page().__class__.__name__ == "MusicPage"
-    assert not ca._tab_bar.isVisible()  # single-tab category hides the tab bar
+    assert ca._tab_bar.isVisibleTo(ca)  # the sub-tab strip keeps a stable height
 
     ca.show_category("Games")
     ca._switch_subtab(2)
@@ -75,7 +112,6 @@ def test_content_area_passes_user_to_settings():
     from ui.content_area import ContentArea
 
     ca = ContentArea(
-        on_logout=lambda: None,
         user={"username": "chris", "email": "chris@example.com"},
     )
     ca.show_category("Settings")

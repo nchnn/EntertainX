@@ -55,12 +55,15 @@ class TitleBar(QWidget):
 
         row = QHBoxLayout(self)
         row.setContentsMargins(theme.SPACE_MD, 0, 0, 0)
-        row.setSpacing(theme.SPACE_SM)
+        # Window controls sit flush like a native title bar; only the brand
+        # block needs an explicit gap.
+        row.setSpacing(0)
 
         mark = QLabel()
         mark.setPixmap(brand_pixmap(20))
         mark.setFixedSize(20, 20)
         row.addWidget(mark, 0, Qt.AlignmentFlag.AlignVCenter)
+        row.addSpacing(theme.SPACE_SM)
 
         self.title_label = QLabel(title)
         self.title_label.setProperty("role", "brand")

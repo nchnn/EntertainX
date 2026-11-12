@@ -5,17 +5,17 @@ from typing import Callable
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
-    QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
 
 from theme import theme_manager as theme
-from ui.components.icons import brand_pixmap, make_icon
-from ui.components.surfaces import Divider
+from ui.components.icons import make_icon
+from ui.components.surfaces import Divider, ElidedLabel, label
 
 CATEGORIES = ["Video", "Music", "Games", "My Lists", "Settings"]
 
@@ -29,7 +29,11 @@ _ICONS = {
 
 
 class Sidebar(QWidget):
-    """Primary navigation rail: brand, account chip, categories, log out."""
+    """Navigation rail: categories in the middle, account + log out at the bottom.
+
+    Branding lives only in the window title bar, so the rail starts directly
+    with navigation and ends with a single, anchored profile row.
+    """
 
     def __init__(
         self,
@@ -48,17 +52,16 @@ class Sidebar(QWidget):
         self._buttons: dict[str, QPushButton] = {}
         self._group = QButtonGroup(self)
         self._group.setExclusive(True)
+        self.logout_button: QPushButton | None = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        layout.addWidget(self._build_header(username))
-        layout.addWidget(Divider())
-        layout.addSpacing(theme.SPACE_MD)
-
         nav = QVBoxLayout()
-        nav.setContentsMargins(theme.SPACE_MD, 0, theme.SPACE_MD, 0)
+        nav.setContentsMargins(
+            theme.SPACE_MD, theme.SPACE_XL, theme.SPACE_MD, theme.SPACE_MD
+        )
         nav.setSpacing(theme.SPACE_XS)
         for category in CATEGORIES:
             button = self._build_nav_button(category)
@@ -68,81 +71,14 @@ class Sidebar(QWidget):
         layout.addLayout(nav)
 
         layout.addStretch(1)
+        layout.addWidget(Divider())
 
-        if on_logout is not None:
-            layout.addWidget(Divider())
-            footer = QVBoxLayout()
-            footer.setContentsMargins(theme.SPACE_MD, theme.SPACE_MD, theme.SPACE_MD, theme.SPACE_LG)
-            footer.setSpacing(0)
-
-            logout = QPushButton("  Log out")
-            logout.setProperty("variant", "nav")
-            logout.setIcon(make_icon("logout", theme.TEXT_MUTED, 18))
-            logout.setIconSize(QSize(18, 18))
-            logout.setFixedHeight(40)
-            logout.setCursor(Qt.CursorShape.PointingHandCursor)
-            logout.setToolTip("Sign out of EntertainX")
-            logout.clicked.connect(lambda: self._on_logout())
-            footer.addWidget(logout)
-            layout.addLayout(footer)
+        self.profile_section = self._build_profile(username)
+        layout.addWidget(self.profile_section)
 
         self.set_active(CATEGORIES[0])
 
     # ── Construction ────────────────────────────────────────────────────────
-    def _build_header(self, username: str) -> QWidget:
-        header = QWidget()
-        column = QVBoxLayout(header)
-        column.setContentsMargins(
-            theme.SPACE_LG + 2, theme.SPACE_XL, theme.SPACE_LG, theme.SPACE_LG
-        )
-        column.setSpacing(theme.SPACE_MD)
-
-        brand_row = QHBoxLayout()
-        brand_row.setContentsMargins(0, 0, 0, 0)
-        brand_row.setSpacing(theme.SPACE_SM)
-
-        mark = QLabel()
-        mark.setPixmap(brand_pixmap(26))
-        mark.setFixedSize(26, 26)
-        brand_row.addWidget(mark, 0, Qt.AlignmentFlag.AlignVCenter)
-
-        wordmark = QLabel("EntertainX")
-        wordmark.setProperty("role", "brand")
-        brand_row.addWidget(wordmark, 0, Qt.AlignmentFlag.AlignVCenter)
-        brand_row.addStretch(1)
-        column.addLayout(brand_row)
-
-        chip = QFrame()
-        chip.setProperty("role", "chip")
-        chip_row = QHBoxLayout(chip)
-        chip_row.setContentsMargins(
-            theme.SPACE_SM, theme.SPACE_SM, theme.SPACE_MD, theme.SPACE_SM
-        )
-        chip_row.setSpacing(theme.SPACE_SM)
-
-        initial = (username.strip() or "?")[0].upper()
-        avatar = QLabel(initial)
-        avatar.setProperty("role", "avatar")
-        avatar.setFixedSize(30, 30)
-        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        chip_row.addWidget(avatar, 0, Qt.AlignmentFlag.AlignVCenter)
-
-        account = QVBoxLayout()
-        account.setContentsMargins(0, 0, 0, 0)
-        account.setSpacing(0)
-
-        self.username_label = QLabel(username)
-        account.addWidget(self.username_label)
-
-        signed_in = QLabel("Signed in")
-        signed_in.setProperty("role", "caption")
-        account.addWidget(signed_in)
-
-        chip_row.addLayout(account, 1)
-        column.addWidget(chip)
-
-        return header
-
     def _build_nav_button(self, category: str) -> QPushButton:
         button = QPushButton(category)
         button.setProperty("variant", "nav")
@@ -155,6 +91,53 @@ class Sidebar(QWidget):
         button.setCursor(Qt.CursorShape.PointingHandCursor)
         button.clicked.connect(lambda checked=False, c=category: self.set_active(c))
         return button
+
+    def _build_profile(self, username: str) -> QWidget:
+        footer = QWidget()
+        row = QHBoxLayout(footer)
+        row.setContentsMargins(
+            theme.SPACE_MD, theme.SPACE_MD, theme.SPACE_MD, theme.SPACE_LG
+        )
+        row.setSpacing(theme.SPACE_SM)
+
+        initial = (username.strip() or "?")[0].upper()
+        self.avatar_label = QLabel(initial)
+        self.avatar_label.setProperty("role", "avatar")
+        self.avatar_label.setFixedSize(30, 30)
+        self.avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        row.addWidget(self.avatar_label, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        account = QVBoxLayout()
+        account.setContentsMargins(0, 0, 0, 0)
+        account.setSpacing(1)
+
+        self.username_label = ElidedLabel(username)
+        self.username_label.setProperty("role", "username")
+        self.username_label.setToolTip(username)
+        self.username_label.setMinimumWidth(0)
+        self.username_label.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+        )
+        account.addWidget(self.username_label)
+
+        self.status_label = label("Signed in", "caption", wrap=False)
+        account.addWidget(self.status_label)
+
+        row.addLayout(account, 1)
+
+        if self._on_logout is not None:
+            self.logout_button = QPushButton()
+            self.logout_button.setProperty("variant", "icon")
+            self.logout_button.setIcon(make_icon("logout", theme.PRIMARY, 18))
+            self.logout_button.setIconSize(QSize(18, 18))
+            self.logout_button.setFixedSize(36, 36)
+            self.logout_button.setToolTip("Log out")
+            self.logout_button.setAccessibleName("Log out")
+            self.logout_button.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.logout_button.clicked.connect(self._handle_logout)
+            row.addWidget(self.logout_button, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        return footer
 
     # ── Navigation ──────────────────────────────────────────────────────────
     def active_category(self) -> str:
@@ -170,3 +153,8 @@ class Sidebar(QWidget):
             button.setProperty("active", "true" if active else "false")
             theme.restyle(button)
         self._on_category(name)
+
+    # ── Session ─────────────────────────────────────────────────────────────
+    def _handle_logout(self) -> None:
+        if self._on_logout is not None:
+            self._on_logout()

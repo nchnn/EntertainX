@@ -13,7 +13,6 @@ class MusicPage(GridPage):
                 album["title"],
                 album["artist"],
                 album["tracks"],
-                thumb_height=160,
                 category=album["artist"],
             )
             for album in ALBUMS

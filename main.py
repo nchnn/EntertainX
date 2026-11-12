@@ -51,11 +51,11 @@ class MainApp(FramelessWindow):
         from ui.main_window import MainWindow
 
         self.set_content(
-            MainWindow(self._auth, user, on_logout=self._do_logout)
+            MainWindow(self._auth, user, on_logout=self._return_to_login)
         )
 
-    def _do_logout(self) -> None:
-        self._auth.logout()
+    def _return_to_login(self) -> None:
+        # MainWindow has already cleared the session via the auth manager.
         self._show_login()
 
 

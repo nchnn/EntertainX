@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Callable
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QButtonGroup,
@@ -28,12 +26,10 @@ from ui.pages.settings import SettingsPage
 class ContentArea(QWidget):
     def __init__(
         self,
-        on_logout: Callable,
         user: dict | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
-        self._on_logout = on_logout
         self._user = user or {}
         self._last_tab: dict[str, int] = {}
         self._current_cat = ""
@@ -59,7 +55,7 @@ class ContentArea(QWidget):
                 ("My Lists", MyListsPage()),
             ],
             "Settings": [
-                ("Settings", SettingsPage(on_logout=on_logout, user=self._user)),
+                ("Settings", SettingsPage(user=self._user)),
             ],
         }
 
@@ -72,7 +68,9 @@ class ContentArea(QWidget):
         self._tab_bar.setObjectName("TabBar")
         self._tab_bar.setFixedHeight(56)
         self._tab_layout = QHBoxLayout(self._tab_bar)
-        self._tab_layout.setContentsMargins(theme.SPACE_XL, 0, theme.SPACE_XL, 0)
+        # Padding inside the tab button is 18px, so a 14px margin puts the
+        # first tab label on the same 32px axis as page titles.
+        self._tab_layout.setContentsMargins(14, 0, 14, 0)
         self._tab_layout.setSpacing(0)
         self._tab_layout.addStretch()
         outer.addWidget(self._tab_bar)
@@ -113,8 +111,6 @@ class ContentArea(QWidget):
             self._tab_group.deleteLater()
         self._tab_group = QButtonGroup(self)
         self._tab_group.setExclusive(True)
-
-        self._tab_bar.setVisible(len(tabs) > 1)
 
         self._current_cat = name
         self._tab_buttons = []

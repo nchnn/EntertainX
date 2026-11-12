@@ -13,7 +13,6 @@ class TVShowsPage(GridPage):
                 show["title"],
                 show["genre"],
                 show["seasons"],
-                thumb_height=140,
                 category=show["genre"],
             )
             for show in SHOWS

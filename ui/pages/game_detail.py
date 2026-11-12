@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from theme import theme_manager as theme
 from ui.components.icons import make_icon
-from ui.components.surfaces import Badge, Card, Divider, ElidedLabel, label
+from ui.components.surfaces import Badge, Card, Divider, label
 from ui.pages.page_shell import PageShell
 
 
@@ -61,8 +61,7 @@ class GameDetailPage(PageShell):
 
         text_column.addWidget(label("About this game", "h2", wrap=False))
 
-        description_label = ElidedLabel(description)
-        description_label.setProperty("role", "muted")
+        description_label = label(description, "muted")
         description_label.setToolTip(description)
         text_column.addWidget(description_label)
 

@@ -121,3 +121,14 @@
 - [ ] Run `python -m pytest -q` → all pass.
 - [ ] Run `QT_QPA_PLATFORM=offscreen python -c "..."` smoke script: build `FramelessWindow`, swap login → main → login.
 - [ ] Manually visual-check on Windows desktop.
+
+### Task 11: Layout and consistency pass
+
+**Date:** 2026-11-12. See the "Follow-up: layout and consistency pass" section of
+`docs/superpowers/specs/2026-11-12-entertainx-grey-pink-redesign-design.md`.
+
+- [x] Single EntertainX branding (title bar only); sidebar footer holds the profile and icon logout.
+- [x] Remove the Settings logout button; keep one auth logout path.
+- [x] Always-present sub-tab strip; shared `CONTROL_HEIGHT` and `CARD_THUMB_HEIGHT`.
+- [x] Responsive `CardGrid` reflow and wrapping game-detail copy.
+- [x] 124 tests, offscreen smoke, native hit-test/maximize, visual check at 900, 1240, and maximized.

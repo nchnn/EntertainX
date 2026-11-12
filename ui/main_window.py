@@ -27,7 +27,7 @@ class MainWindow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self._content = ContentArea(on_logout=self._do_logout, user=user)
+        self._content = ContentArea(user=user)
         self._sidebar = Sidebar(
             username=user["username"],
             on_category=self._content.show_category,

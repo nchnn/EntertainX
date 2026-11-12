@@ -70,7 +70,9 @@ FONT_SIZE_H2 = 22
 # ── Layout constants shared by chrome ───────────────────────────────────────
 TITLEBAR_HEIGHT = 42
 SIDEBAR_WIDTH = 236
+CONTROL_HEIGHT = 44
 CARD_MIN_WIDTH = 210
+CARD_THUMB_HEIGHT = 150
 
 # Legacy aliases kept so older imports keep working.
 BG_DARK = BG
@@ -168,6 +170,11 @@ QLabel[role="success"] {
 QLabel[role="fieldLabel"] {
     color: %(text_secondary)s;
     font-size: %(size_sm)spx;
+    font-weight: 600;
+}
+QLabel[role="username"] {
+    color: %(text)s;
+    font-size: %(size_base)spx;
     font-weight: 600;
 }
 QLabel[role="pill"] {
@@ -330,6 +337,28 @@ QPushButton[variant="link"]:hover {
 }
 QPushButton[variant="link"]:pressed {
     color: %(accent_pressed)s;
+}
+
+QPushButton[variant="icon"] {
+    background-color: %(bg_elevated)s;
+    border: 1px solid %(border)s;
+    border-radius: %(radius_md)spx;
+    padding: 0px;
+}
+QPushButton[variant="icon"]:hover {
+    background-color: %(button_hover)s;
+    border-color: %(accent_soft_strong)s;
+}
+QPushButton[variant="icon"]:pressed {
+    background-color: %(bg_card)s;
+    border-color: %(accent_pressed)s;
+}
+QPushButton[variant="icon"]:focus {
+    border: 1px solid %(accent)s;
+}
+QPushButton[variant="icon"]:disabled {
+    background-color: %(bg_card)s;
+    border-color: %(bg_elevated)s;
 }
 
 QPushButton[variant="nav"] {

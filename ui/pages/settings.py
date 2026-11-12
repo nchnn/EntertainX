@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-from typing import Callable
-
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
-    QPushButton,
     QWidget,
 )
 
@@ -26,9 +23,14 @@ _SWATCHES = [
 
 
 class SettingsPage(PageShell):
+    """Profile, appearance preview, and session information.
+
+    Logging out is handled exclusively by the sidebar footer so there is only
+    one logout action in the application.
+    """
+
     def __init__(
         self,
-        on_logout: Callable,
         user: dict | None = None,
         parent: QWidget | None = None,
     ) -> None:
@@ -39,9 +41,13 @@ class SettingsPage(PageShell):
         )
         user = user or {}
 
-        self.add(self._profile_card(user))
-        self.add(self._appearance_card())
-        self.add(self._session_card(on_logout))
+        self.profile_card = self._profile_card(user)
+        self.appearance_card = self._appearance_card()
+        self.session_card = self._session_card()
+
+        self.add(self.profile_card)
+        self.add(self.appearance_card)
+        self.add(self.session_card)
         self.add_stretch()
 
     # ── Sections ────────────────────────────────────────────────────────────
@@ -52,7 +58,9 @@ class SettingsPage(PageShell):
             label("This is the account currently signed in to EntertainX.", "muted")
         )
         card.body.addWidget(Divider())
-        card.body.addWidget(LabeledValue("Username", user.get("username", "Not signed in")))
+        card.body.addWidget(
+            LabeledValue("Username", user.get("username", "Not signed in"))
+        )
         card.body.addWidget(LabeledValue("Email", user.get("email", "Not available")))
         return card
 
@@ -78,7 +86,7 @@ class SettingsPage(PageShell):
                 f"border: 1px solid {theme.BORDER_STRONG};"
                 f"border-radius: {theme.RADIUS_SM}px;"
             )
-            swatches.addWidget(swatch)
+            swatches.addWidget(swatch, 0, Qt.AlignmentFlag.AlignVCenter)
         swatches.addStretch(1)
         card.body.addLayout(swatches)
 
@@ -91,22 +99,14 @@ class SettingsPage(PageShell):
         )
         return card
 
-    def _session_card(self, on_logout: Callable) -> Card:
+    def _session_card(self) -> Card:
         card = Card()
         card.body.addWidget(SectionLabel("Session"))
-
-        row = QHBoxLayout()
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(theme.SPACE_MD)
-        row.addWidget(
-            label("Signing out clears the session and returns to the login screen.", "muted"),
-            1,
+        card.body.addWidget(
+            label(
+                "This session stays active until you log out. Use the log out "
+                "button beside your profile at the bottom of the sidebar.",
+                "muted",
+            )
         )
-
-        self.logout_button = QPushButton("Log out")
-        self.logout_button.setProperty("variant", "subtle")
-        self.logout_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.logout_button.clicked.connect(on_logout)
-        row.addWidget(self.logout_button, 0, Qt.AlignmentFlag.AlignRight)
-        card.body.addLayout(row)
         return card

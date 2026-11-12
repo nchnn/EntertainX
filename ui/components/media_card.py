@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -29,7 +29,7 @@ class MediaCard(QFrame):
         title: str,
         subtitle: str,
         meta: str = "",
-        thumb_height: int = 116,
+        thumb_height: int = theme.CARD_THUMB_HEIGHT,
         category: str = "",
         parent: QWidget | None = None,
     ) -> None:
@@ -60,7 +60,7 @@ class MediaCard(QFrame):
         text_box.setContentsMargins(
             theme.SPACE_MD, theme.SPACE_MD, theme.SPACE_MD, theme.SPACE_MD
         )
-        text_box.setSpacing(3)
+        text_box.setSpacing(theme.SPACE_XS)
 
         self.title_label = ElidedLabel(title)
         self.title_label.setProperty("role", "h3")
@@ -109,6 +109,9 @@ class CardGrid(QWidget):
         self._min_width = min_width
         self._columns = 0
         self.cards: list[MediaCard] = []
+        self.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred
+        )
 
         self._grid = QGridLayout(self)
         self._grid.setContentsMargins(0, 0, 0, 0)
@@ -136,6 +139,15 @@ class CardGrid(QWidget):
         return [card for card in self.cards if not card.isHidden()]
 
     # ── Layout ──────────────────────────────────────────────────────────────
+    def minimumSizeHint(self) -> QSize:  # noqa: N802 (Qt naming)
+        """Never lock the grid wider than one card.
+
+        The layout's minimum width grows with the current column count. If that
+        propagated to the enclosing scroll area, the page could not shrink
+        again and the last column would be clipped after resizing down.
+        """
+        return QSize(self._min_width, super().minimumSizeHint().height())
+
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         super().resizeEvent(event)
         self._reflow()

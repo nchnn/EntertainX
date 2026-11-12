@@ -13,7 +13,6 @@ class BrowseGamesPage(GridPage):
                 game["title"],
                 game["genre"],
                 game["players"],
-                thumb_height=120,
                 category=game["genre"],
             )
             for game in GAMES

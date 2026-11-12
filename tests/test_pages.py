@@ -23,7 +23,7 @@ def test_every_page_builds_with_a_header(app):
         FireboyPage(),
         BrowseGamesPage(),
         MyListsPage(),
-        SettingsPage(on_logout=lambda: None),
+        SettingsPage(),
     ]
     for page in pages:
         assert page.title
@@ -70,23 +70,71 @@ def test_settings_page_shows_signed_in_user(app):
 
     from ui.pages.settings import SettingsPage
 
-    page = SettingsPage(
-        on_logout=lambda: None,
-        user={"username": "chris", "email": "chris@example.com"},
-    )
+    page = SettingsPage(user={"username": "chris", "email": "chris@example.com"})
     texts = [child.text() for child in page.findChildren(QLabel)]
     assert "chris" in texts
     assert "chris@example.com" in texts
-    assert page.logout_button.isEnabled()
 
 
-def test_settings_logout_button_calls_back(app):
+def test_settings_page_has_no_logout_button(app):
+    """Logging out belongs to the sidebar so there is only one such action."""
+    from PySide6.QtWidgets import QPushButton
+
     from ui.pages.settings import SettingsPage
 
-    calls = []
-    page = SettingsPage(on_logout=lambda: calls.append(True), user={})
-    page.logout_button.click()
-    assert calls == [True]
+    page = SettingsPage(user={"username": "chris", "email": "chris@example.com"})
+    buttons = page.findChildren(QPushButton)
+    assert buttons == []
+    assert not hasattr(page, "logout_button")
+
+    from PySide6.QtWidgets import QLabel
+
+    texts = [child.text() for child in page.findChildren(QLabel)]
+    assert any("sidebar" in text.lower() for text in texts)
+
+
+def test_settings_cards_are_exposed(app):
+    from ui.pages.settings import SettingsPage
+
+    page = SettingsPage(user={})
+    assert page.profile_card is not None
+    assert page.appearance_card is not None
+    assert page.session_card is not None
+
+
+def test_card_grid_reflows_to_available_width(app):
+    """Resizing the viewport must drop columns, not clip the last one."""
+    from PySide6.QtWidgets import QFrame, QScrollArea
+
+    from theme import theme_manager as theme
+    from ui.components.media_card import CardGrid, MediaCard
+
+    cards = [MediaCard("film", f"Title {i}", "Subtitle") for i in range(8)]
+    grid = CardGrid(cards)
+    grid.setMinimumSize(0, 0)
+
+    area = QScrollArea()
+    area.setFrameShape(QFrame.Shape.NoFrame)
+    area.setWidgetResizable(True)
+    area.setWidget(grid)
+    area.resize(600, 400)
+    area.show()
+    app.processEvents()
+    assert grid._columns == 2
+
+    area.resize(980, 400)
+    app.processEvents()
+    assert grid._columns == 4
+    assert all(card.width() >= theme.CARD_MIN_WIDTH for card in cards)
+
+    area.resize(600, 400)
+    app.processEvents()
+    assert grid._columns == 2, "grid did not reflow back down"
+
+    # The grid must stay shrinkable or the page canvas locks wider than the
+    # viewport after a resize.
+    assert grid.minimumSizeHint().width() == theme.CARD_MIN_WIDTH
+    area.close()
 
 
 @pytest.mark.parametrize("page_name", ["ChessPage", "FireboyPage"])

@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QComboBox, QWidget
 
+from theme import theme_manager as theme
 from ui.components.media_card import MediaCard
 from ui.pages.page_shell import GridPage
 from ui.pages.sample_data import MOVIES
@@ -13,7 +14,6 @@ class MoviesPage(GridPage):
                 movie["title"],
                 movie["genre"],
                 f"{movie['year']}  ·  {movie['runtime']}",
-                thumb_height=150,
                 category=movie["genre"],
             )
             for movie in MOVIES
@@ -27,6 +27,7 @@ class MoviesPage(GridPage):
         )
 
         self.genre_filter = QComboBox()
+        self.genre_filter.setMinimumHeight(theme.CONTROL_HEIGHT)
         self.genre_filter.addItem("All genres")
         for genre in sorted({movie["genre"] for movie in MOVIES}):
             self.genre_filter.addItem(genre)

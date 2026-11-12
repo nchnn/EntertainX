@@ -120,3 +120,39 @@ data, not layout.
 
 Exact spacing, icon geometry, sample content, and copy beyond the strings the
 owner specified.
+
+## Follow-up: layout and consistency pass
+
+Date: 2026-11-12. Scope: fix duplication, alignment, spacing, and resize
+behaviour without changing the palette, the shell, the database, or the auth
+logic.
+
+- **Branding.** The EntertainX mark and name appear only in the custom title
+  bar. The sidebar has no logo or project name; it opens directly with
+  navigation, so the rail reads as pure navigation.
+- **One logout action.** The sidebar footer owns logout: profile avatar,
+  username, "Signed in", and a 36x36 icon button (pink `logout` glyph, subtle
+  elevated background, hover/pressed states, "Log out" tooltip and accessible
+  name). `MainWindow` wires it to the existing auth logout; `MainApp` returns
+  to the login view. `ContentArea` and `SettingsPage` no longer accept a
+  logout callback. Settings keeps a Session card that points to the sidebar.
+- **Sidebar structure.** Header -> nav (Video, Music, Games, My Lists,
+  Settings) -> stretch -> divider -> profile/logout footer. The stretch keeps
+  the footer at the bottom at every window height; the username is an
+  `ElidedLabel` with an `Ignored` horizontal policy so long names truncate
+  instead of displacing the logout button.
+- **Stable content axis.** The sub-tab strip is always present, including
+  single-tab categories. The first tab label shares the 32px page-title axis
+  (14px bar margin + 18px tab padding), so page headers no longer jump by the
+  strip height when switching categories.
+- **Shared metrics.** `CONTROL_HEIGHT = 44` for search fields and toolbars,
+  `CARD_THUMB_HEIGHT = 150` for every media card, and `SPACE_XS` for card text
+  spacing. Pages no longer override card thumb heights, so cards are the same
+  height across Video, Music, and Games.
+- **Responsive grid.** `CardGrid.minimumSizeHint()` reports one card width
+  instead of the live layout minimum. Without it, the grid locked wider than
+  the viewport after a resize and clipped the last column; it now drops to 2
+  columns at 900px and returns to 4 when widened.
+- **Wrapping detail copy.** The game detail description wraps instead of
+  relying on a single-line elided label, removing the horizontal scrollbar on
+  the Chess/Fireboy pages at the minimum window size.

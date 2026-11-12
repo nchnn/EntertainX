@@ -13,7 +13,6 @@ class YouTubePage(GridPage):
                 video["title"],
                 video["channel"],
                 video["length"],
-                thumb_height=132,
             )
             for video in VIDEOS
         ]
