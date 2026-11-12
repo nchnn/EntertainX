@@ -2,7 +2,15 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QRect, QRectF, QSize, Qt, QVariantAnimation, Signal
+from PySide6.QtCore import (
+    QRect,
+    QRectF,
+    QSignalBlocker,
+    QSize,
+    Qt,
+    QVariantAnimation,
+    Signal,
+)
 from PySide6.QtGui import (
     QColor,
     QLinearGradient,
@@ -275,11 +283,13 @@ class MusicPlayerCard(QFrame):
             return
         if self._progress >= 1.0:
             self._set_progress(0.0)
-        self._animation.setStartValue(self._progress)
-        self._animation.setEndValue(1.0)
-        self._animation.setDuration(
-            max(1, int(self._track_ms * (1.0 - self._progress)))
-        )
+        remaining = max(1, int(self._track_ms * (1.0 - self._progress)))
+        # The setters re-emit valueChanged at the retained current time, which
+        # would overwrite _progress before the duration is computed.
+        with QSignalBlocker(self._animation):
+            self._animation.setStartValue(self._progress)
+            self._animation.setEndValue(1.0)
+            self._animation.setDuration(remaining)
         self._animation.start()
         self._set_playing(True)
         self.play_toggled.emit(True)

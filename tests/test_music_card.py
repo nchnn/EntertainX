@@ -92,6 +92,17 @@ def test_progress_updates_bar_and_elapsed(app):
     card.pause()
 
 
+def test_resume_keeps_the_remaining_time(app):
+    card = MusicPlayerCard("A", "B", "1 track", "0:10")
+    card.play()
+    card._animation.setCurrentTime(5_000)
+    card.pause()
+    card.play()
+    assert card._animation.duration() == pytest.approx(5_000, abs=50)
+    assert card._progress == pytest.approx(0.5, abs=0.01)
+    card.pause()
+
+
 def test_finishing_resets_to_the_start(app):
     card = MusicPlayerCard("A", "B", "1 track", "3:42")
     card.play()
