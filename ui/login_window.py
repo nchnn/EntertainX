@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEasingCurve, QEvent, QPropertyAnimation, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QFrame,
     QHBoxLayout,
+    QLabel,
     QPushButton,
     QScrollArea,
     QSizePolicy,
@@ -15,14 +16,87 @@ from PySide6.QtWidgets import (
 from auth.auth_manager import AuthManager
 from auth.preferences import LoginPreferences
 from theme import theme_manager as theme
-from ui.components.fields import FormField, IconLineEdit, PasswordLineEdit
-from ui.components.surfaces import BrandLockup, InlineBanner, label
+from ui.components.auth_stage import AuthStage
+from ui.components.fields import (
+    FormField,
+    IconLineEdit,
+    PasswordLineEdit,
+    PasswordStrength,
+)
+from ui.components.icons import make_icon
+from ui.components.surfaces import InlineBanner, label
 
-CARD_MAX_WIDTH = 430
+FORM_MAX_WIDTH = 392
+SPLIT_MIN_WIDTH = 1040
+
+
+class _SegmentSwitch(QFrame):
+    """Two-state switch whose indicator slides to the active segment."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setProperty("role", "segmented")
+        self._buttons: list[QPushButton] = []
+        self._index = 0
+
+        self._indicator = QFrame(self)
+        self._indicator.setProperty("role", "segmentIndicator")
+        self._indicator.setAttribute(
+            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True
+        )
+
+        self._row = QHBoxLayout(self)
+        inset = theme.SPACE_XS - 1
+        self._row.setContentsMargins(inset, inset, inset, inset)
+        self._row.setSpacing(theme.SPACE_XS - 2)
+
+        self._slide = QPropertyAnimation(self._indicator, b"geometry", self)
+        self._slide.setDuration(170)
+        self._slide.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+    def add_segment(self, text: str, handler) -> QPushButton:
+        button = QPushButton(text)
+        button.setProperty("variant", "segment")
+        button.setProperty("active", False)
+        button.setMinimumHeight(32)
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.clicked.connect(handler)
+        self._buttons.append(button)
+        self._row.addWidget(button, 1)
+        return button
+
+    def set_active(self, index: int, animate: bool = False) -> None:
+        self._index = index
+        for position, button in enumerate(self._buttons):
+            button.setProperty("active", position == index)
+            theme.restyle(button)
+
+        target = self._segment_rect(index)
+        self._slide.stop()
+        if animate and self.isVisible() and target.isValid():
+            self._slide.setStartValue(self._indicator.geometry())
+            self._slide.setEndValue(target)
+            self._slide.start()
+        else:
+            self._indicator.setGeometry(target)
+
+    def _segment_rect(self, index: int):
+        if not 0 <= index < len(self._buttons):
+            return self._indicator.geometry()
+        return self._buttons[index].geometry()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        super().resizeEvent(event)
+        self._slide.stop()
+        self._indicator.setGeometry(self._segment_rect(self._index))
 
 
 class LoginWindow(QWidget):
-    """Sign-in and registration surface with a shared card design."""
+    """Sign-in and registration surface with a shared split layout.
+
+    Wide windows show the brand stage beside the form; narrow windows drop the
+    stage and centre the same form so the window minimum size stays usable.
+    """
 
     def __init__(
         self,
@@ -35,65 +109,155 @@ class LoginWindow(QWidget):
         self._on_success = on_login_success
         self._prefs = preferences if preferences is not None else LoginPreferences()
         self._busy = False
+        self._split: bool | None = None
+        self._blur_checks: dict[QWidget, object] = {}
 
         self.setObjectName("AuthBackdrop")
         self._build()
         self._restore_remembered()
+        self._apply_layout_mode(self.width())
 
     # ── Layout ──────────────────────────────────────────────────────────────
     def _build(self) -> None:
-        root = QVBoxLayout(self)
+        root = QHBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        root.addWidget(scroll)
+        self._stage = AuthStage()
+        root.addWidget(self._stage, 11)
 
-        canvas = QWidget()
-        canvas.setObjectName("AuthBackdrop")
-        column = QVBoxLayout(canvas)
-        column.setContentsMargins(theme.SPACE_XXL, theme.SPACE_XXL, theme.SPACE_XXL, theme.SPACE_XXL)
-        column.setSpacing(theme.SPACE_LG)
-        column.addStretch(1)
+        self._pane = QFrame()
+        self._pane.setProperty("role", "authPane")
+        self._pane.setProperty("split", False)
+        self._pane.setFrameShape(QFrame.Shape.NoFrame)
+        root.addWidget(self._pane, 9)
 
+        pane = QVBoxLayout(self._pane)
+        pane.setContentsMargins(0, 0, 0, 0)
+        pane.setSpacing(0)
+
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self._scroll.viewport().setAutoFillBackground(False)
+        pane.addWidget(self._scroll)
+
+        host = QWidget()
+        host.setObjectName("AuthFormHost")
+        host.setAutoFillBackground(False)
+        column = QVBoxLayout(host)
+        column.setContentsMargins(
+            theme.SPACE_XXL, theme.SPACE_XL, theme.SPACE_XXL, theme.SPACE_XL
+        )
+        column.setSpacing(0)
+        self._host_layout = column
+
+        self._form_column = QWidget()
+        self._form_column.setFixedWidth(FORM_MAX_WIDTH)
+        self._form_column.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Maximum
+        )
+        stack = QVBoxLayout(self._form_column)
+        stack.setContentsMargins(0, 0, 0, 0)
+        stack.setSpacing(0)
+
+        self._tabs = self._build_tabs()
         self._login_card = self._build_login_card()
         self._register_card = self._build_register_card()
         self._register_card.setVisible(False)
 
-        column.addWidget(self._login_card, 0, Qt.AlignmentFlag.AlignHCenter)
-        column.addWidget(self._register_card, 0, Qt.AlignmentFlag.AlignHCenter)
-        column.addStretch(1)
+        stack.addWidget(self._tabs)
+        stack.addSpacing(theme.SPACE_XL + 6)
+        stack.addWidget(self._login_card)
+        stack.addWidget(self._register_card)
 
-        scroll.setWidget(canvas)
-
-    def _base_card(self) -> tuple[QFrame, QVBoxLayout]:
-        card = QFrame()
-        card.setProperty("role", "card")
-        card.setMaximumWidth(CARD_MAX_WIDTH)
-        card.setMinimumWidth(400)
-        card.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
-
-        body = QVBoxLayout(card)
-        body.setContentsMargins(
-            theme.SPACE_XXL, theme.SPACE_XXL, theme.SPACE_XXL, theme.SPACE_XXL
+        column.addWidget(
+            self._form_column,
+            0,
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter,
         )
+        column.addStretch(1)
+        column.addWidget(self._build_footer())
+        self._scroll.setWidget(host)
+
+        self._sync_tabs(0)
+
+    def _build_footer(self) -> QFrame:
+        """Quiet trust line pinned to the bottom of the form host."""
+        footer = QFrame()
+        footer.setProperty("role", "authFooter")
+        row = QHBoxLayout(footer)
+        row.setContentsMargins(0, theme.SPACE_MD, 0, 0)
+        row.setSpacing(theme.SPACE_SM)
+
+        glyph = QLabel()
+        glyph.setPixmap(make_icon("lock", theme.TEXT_MUTED, 13).pixmap(13, 13))
+        glyph.setFixedSize(13, 13)
+
+        row.addStretch(1)
+        row.addWidget(glyph, 0, Qt.AlignmentFlag.AlignVCenter)
+        row.addWidget(
+            label("Your account and lists stay on this device.", "muted", wrap=False)
+        )
+        row.addStretch(1)
+        return footer
+
+    def _form(self) -> tuple[QWidget, QVBoxLayout]:
+        """A form block: full-width fields on the pane ground, no nested card."""
+        form = QWidget()
+        form.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Maximum)
+        body = QVBoxLayout(form)
+        body.setContentsMargins(0, 0, 0, 0)
         body.setSpacing(theme.SPACE_MD + 2)
-        return card, body
+        return form, body
 
-    # ── Login card ──────────────────────────────────────────────────────────
-    def _build_login_card(self) -> QFrame:
-        card, body = self._base_card()
+    @staticmethod
+    def _heading(title: str, support: str) -> QWidget:
+        block = QWidget()
+        stack = QVBoxLayout(block)
+        stack.setContentsMargins(0, 0, 0, 0)
+        stack.setSpacing(0)
 
-        body.addWidget(BrandLockup(38, "Stream. Play. Listen."))
-        body.addSpacing(theme.SPACE_MD)
+        rule = QFrame()
+        rule.setProperty("role", "accentRule")
+        rule.setFixedSize(36, 3)
+        stack.addWidget(rule)
+        stack.addSpacing(theme.SPACE_MD)
 
-        heading = label("Welcome back", "h1", wrap=False)
-        body.addWidget(heading)
+        # A fixed-height title can't be squeezed by the scroll host on short
+        # windows; word-wrapped labels otherwise lose their descenders.
+        title_label = label(title, "h1", wrap=False)
+        title_label.setSizePolicy(
+            QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
+        )
+        stack.addWidget(title_label)
+        stack.addSpacing(theme.SPACE_XS + 2)
+        stack.addWidget(label(support, "muted"))
+        return block
+
+    # ── Mode switch ─────────────────────────────────────────────────────────
+    def _build_tabs(self) -> _SegmentSwitch:
+        tabs = _SegmentSwitch()
+        self._login_tab = tabs.add_segment("Sign in", self._go_login)
+        self._register_tab = tabs.add_segment("Create account", self._go_register)
+        return tabs
+
+    def _sync_tabs(self, index: int) -> None:
+        self._tabs.set_active(index, animate=self._tabs.isVisible())
+        self._scroll.verticalScrollBar().setValue(0)
+
+    # ── Login form ──────────────────────────────────────────────────────────
+    def _build_login_card(self) -> QWidget:
+        form, body = self._form()
+
         body.addWidget(
-            label("Sign in to pick up where you left off.", "muted")
+            self._heading(
+                "Welcome back",
+                "Your lists and ratings are right where you left them.",
+            )
         )
         body.addSpacing(theme.SPACE_SM)
 
@@ -123,41 +287,32 @@ class LoginWindow(QWidget):
         body.addSpacing(theme.SPACE_XS)
         self._login_button = QPushButton("Sign in")
         self._login_button.setProperty("variant", "primary")
-        self._login_button.setMinimumHeight(46)
+        self._login_button.setMinimumHeight(48)
         self._login_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._login_button.clicked.connect(self._do_login)
         body.addWidget(self._login_button)
 
-        body.addSpacing(theme.SPACE_XS)
-        footer = QHBoxLayout()
-        footer.setContentsMargins(0, 0, 0, 0)
-        footer.setSpacing(0)
-        footer.addStretch(1)
-        footer.addWidget(label("New to EntertainX?", "muted", wrap=False))
-        link = QPushButton("Create an account")
-        link.setProperty("variant", "link")
-        link.setCursor(Qt.CursorShape.PointingHandCursor)
-        link.clicked.connect(self._go_register)
-        footer.addWidget(link)
-        footer.addStretch(1)
-        body.addLayout(footer)
-
         self._login_user.returnPressed.connect(lambda: self._login_pass.setFocus())
         self._login_pass.returnPressed.connect(self._do_login)
-        return card
 
-    # ── Register card ───────────────────────────────────────────────────────
-    def _build_register_card(self) -> QFrame:
-        card, body = self._base_card()
+        # A failed attempt describes what was submitted, so drop the field
+        # errors as soon as the user edits them instead of leaving them red.
+        self._login_user.textChanged.connect(
+            lambda _text: self._user_field.clear_error()
+        )
+        self._login_pass.textChanged.connect(
+            lambda _text: self._pass_field.clear_error()
+        )
+        return form
 
-        body.addWidget(BrandLockup(34, "Your EntertainX profile"))
-        body.addSpacing(theme.SPACE_SM)
+    # ── Register form ───────────────────────────────────────────────────────
+    def _build_register_card(self) -> QWidget:
+        form, body = self._form()
 
-        body.addWidget(label("Create your account", "h1", wrap=False))
         body.addWidget(
-            label(
-                "One account for movies, music, games, and everything you save.",
-                "muted",
+            self._heading(
+                "Create your account",
+                "One account for the movies, music, and games you keep.",
             )
         )
         body.addSpacing(theme.SPACE_SM)
@@ -165,17 +320,20 @@ class LoginWindow(QWidget):
         self._register_error = InlineBanner("error")
         body.addWidget(self._register_error)
 
-        self._reg_user = IconLineEdit("user", "3-20 letters or numbers")
-        self._reg_user_field = FormField("Username", self._reg_user)
+        self._reg_user = IconLineEdit("user", "Choose a username")
+        self._reg_user_field = FormField(
+            "Username", self._reg_user, hint="3-20 letters or numbers."
+        )
         body.addWidget(self._reg_user_field)
 
         self._reg_email = IconLineEdit("mail", "you@example.com")
         self._reg_email_field = FormField("Email", self._reg_email)
         body.addWidget(self._reg_email_field)
 
-        self._reg_pass = PasswordLineEdit("At least 6 characters")
+        self._reg_pass = PasswordLineEdit("Choose a password")
+        self._strength = PasswordStrength(self._reg_pass, minimum=6)
         self._reg_pass_field = FormField(
-            "Password", self._reg_pass, hint="Use at least 6 characters."
+            "Password", self._reg_pass, accessory=self._strength
         )
         body.addWidget(self._reg_pass_field)
 
@@ -186,30 +344,95 @@ class LoginWindow(QWidget):
         body.addSpacing(theme.SPACE_XS)
         self._register_button = QPushButton("Create account")
         self._register_button.setProperty("variant", "primary")
-        self._register_button.setMinimumHeight(46)
+        self._register_button.setMinimumHeight(48)
         self._register_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._register_button.clicked.connect(self._do_register)
         body.addWidget(self._register_button)
 
-        footer = QHBoxLayout()
-        footer.setContentsMargins(0, 0, 0, 0)
-        footer.setSpacing(0)
-        footer.addStretch(1)
-        footer.addWidget(label("Already have an account?", "muted", wrap=False))
-        link = QPushButton("Sign in")
-        link.setProperty("variant", "link")
-        link.setCursor(Qt.CursorShape.PointingHandCursor)
-        link.clicked.connect(self._go_login)
-        footer.addWidget(link)
-        footer.addStretch(1)
-        body.addLayout(footer)
+        for field in (
+            self._reg_user,
+            self._reg_email,
+            self._reg_pass,
+            self._reg_confirm,
+        ):
+            field.returnPressed.connect(self._do_register)
+        self._wire_register_validation()
+        return form
 
-        return card
+    # ── Live validation ─────────────────────────────────────────────────────
+    def _wire_register_validation(self) -> None:
+        """Validate on blur, and drop stale errors as soon as a fix lands.
+
+        ``FocusOut`` is used instead of ``editingFinished`` because the latter
+        also fires on Enter, which would clear the errors a failed submit just
+        set (e.g. "Username already taken").
+        """
+        for widget, field, validator in (
+            (self._reg_user, self._reg_user_field, self._auth.validate_username),
+            (self._reg_email, self._reg_email_field, self._auth.validate_email),
+            (self._reg_pass, self._reg_pass_field, self._auth.validate_password),
+        ):
+            self._blur_checks[widget] = (
+                lambda w=widget, f=field, v=validator: self._check_on_blur(w, f, v)
+            )
+            widget.installEventFilter(self)
+            widget.textChanged.connect(
+                lambda _text, w=widget, f=field, v=validator: self._clear_if_fixed(
+                    w, f, v
+                )
+            )
+
+        self._blur_checks[self._reg_confirm] = self._check_confirm_on_blur
+        self._reg_confirm.installEventFilter(self)
+        self._reg_confirm.textChanged.connect(self._clear_confirm_if_fixed)
+        self._reg_pass.textChanged.connect(lambda _text: self._clear_confirm_if_fixed())
+
+    def _check_on_blur(self, widget, wrapper, validator) -> None:
+        text = widget.text().strip()
+        if not text:
+            wrapper.clear_error()
+            return
+        error = validator(text)
+        if error:
+            wrapper.set_error(error)
+        else:
+            wrapper.clear_error()
+
+    def _clear_if_fixed(self, widget, wrapper, validator) -> None:
+        if not wrapper.has_error:
+            return
+        text = widget.text().strip()
+        if not text or not validator(text):
+            wrapper.clear_error()
+
+    def _check_confirm_on_blur(self) -> None:
+        confirm = self._reg_confirm.text()
+        if not confirm:
+            self._reg_confirm_field.clear_error()
+        elif confirm != self._reg_pass.text():
+            self._reg_confirm_field.set_error("Passwords do not match")
+        else:
+            self._reg_confirm_field.clear_error()
+
+    def _clear_confirm_if_fixed(self) -> None:
+        if not self._reg_confirm_field.has_error:
+            return
+        confirm = self._reg_confirm.text()
+        if not confirm or confirm == self._reg_pass.text():
+            self._reg_confirm_field.clear_error()
+
+    def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt naming)
+        check = self._blur_checks.get(obj)
+        if check is not None and event.type() == QEvent.Type.FocusOut:
+            check()
+        return super().eventFilter(obj, event)
 
     # ── Page switching ──────────────────────────────────────────────────────
     def _switch(self, index: int) -> None:
         self._login_card.setVisible(index == 0)
         self._register_card.setVisible(index == 1)
+        self._sync_tabs(index)
+        self._update_vertical_rhythm()
 
     def current_page(self) -> int:
         return 0 if not self._login_card.isHidden() else 1
@@ -251,6 +474,66 @@ class LoginWindow(QWidget):
         else:
             target = self._reg_user
         target.setFocus()
+
+    # ── Responsive composition ──────────────────────────────────────────────
+    def _apply_layout_mode(self, width: int) -> None:
+        split = width >= SPLIT_MIN_WIDTH
+        if split == self._split:
+            return
+        self._split = split
+        self._stage.setVisible(split)
+        self._pane.setProperty("split", split)
+        theme.restyle(self._pane)
+        self._update_vertical_rhythm()
+
+    def _update_vertical_rhythm(self) -> None:
+        """Keep the mode switch at one height in both forms.
+
+        The login form is shorter than the register form, so centring each one
+        separately would make the tab strip jump on every switch. The offset is
+        derived from the taller form instead, clamped to 24-96px. The form
+        column is also pinned to the visible form's measured height so the
+        scroll host cannot squeeze wrapped headings on short windows.
+        """
+        chrome = self._tabs.sizeHint().height() + theme.SPACE_XL + 6
+        tallest = chrome + max(
+            self._form_height(self._login_card),
+            self._form_height(self._register_card),
+        )
+        available = max(self.height(), 1)
+        offset = max(
+            theme.SPACE_XL,
+            min(theme.SPACE_XXL * 3, (available - tallest) // 2),
+        )
+        side = theme.SPACE_XXL if self._split else theme.SPACE_XL
+        self._host_layout.setContentsMargins(
+            side, offset, side, theme.SPACE_XL
+        )
+
+        # The host layout sizes a Maximum-policy column to its minimum hint,
+        # which squeezes wrapped headings by a few pixels. Pin the column to
+        # what the visible form actually needs so no label is compressed.
+        visible = self._register_card if self.current_page() else self._login_card
+        self._form_column.setMinimumHeight(chrome + self._form_height(visible))
+
+    @staticmethod
+    def _form_height(form: QWidget) -> int:
+        """Height a form needs at its fixed width, wrapped headings included."""
+        hint = form.sizeHint().height()
+        if form.hasHeightForWidth():
+            hint = max(hint, form.heightForWidth(FORM_MAX_WIDTH))
+        return hint
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        super().resizeEvent(event)
+        self._apply_layout_mode(self.width())
+        self._update_vertical_rhythm()
+
+    def showEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        super().showEvent(event)
+        # Fonts and stylesheets are polished on first show; recompute once the
+        # forms report their final size hints.
+        self._update_vertical_rhythm()
 
     # ── Remember Me ─────────────────────────────────────────────────────────
     def _restore_remembered(self) -> None:

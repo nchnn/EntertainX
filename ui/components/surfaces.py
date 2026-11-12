@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from theme import theme_manager as theme
-from ui.components.icons import brand_pixmap, make_icon
+from ui.components.icons import make_icon
 
 
 def label(
@@ -239,32 +239,3 @@ class EmptyState(QWidget):
             stack.addWidget(hint_label)
 
         column.addWidget(inner, 0, Qt.AlignmentFlag.AlignHCenter)
-
-
-class BrandLockup(QWidget):
-    """Mark + wordmark used on the auth cards."""
-
-    def __init__(self, size: int = 36, tagline: str = "", parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        row = QHBoxLayout(self)
-        row.setContentsMargins(0, 0, 0, 0)
-        row.setSpacing(theme.SPACE_MD)
-
-        mark = QLabel()
-        mark.setPixmap(brand_pixmap(size))
-        mark.setFixedSize(size, size)
-        row.addWidget(mark, 0, Qt.AlignmentFlag.AlignVCenter)
-
-        text_column = QVBoxLayout()
-        text_column.setContentsMargins(0, 0, 0, 0)
-        text_column.setSpacing(0)
-
-        wordmark = label("EntertainX", "brand", wrap=False)
-        text_column.addWidget(wordmark)
-
-        if tagline:
-            subtitle = label(tagline, "caption", wrap=False)
-            text_column.addWidget(subtitle)
-
-        row.addLayout(text_column)
-        row.addStretch(1)

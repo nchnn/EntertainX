@@ -1,7 +1,19 @@
 venv/
 .env
+.env.*
+!.env.example
 __pycache__/
 *.pyc
 .idea/
 .vscode/
 .superpowers/
+.impeccable/
+
+# Generated output
+design_system_output.txt
+.claude/skills/ui-ux-pro-max/design_system.md
+
+# OS / logs
+Thumbs.db
+desktop.ini
+*.log

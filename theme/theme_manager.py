@@ -26,7 +26,7 @@ BORDER_STRONG = "#605A62"
 
 # ── Accent ──────────────────────────────────────────────────────────────────
 PRIMARY = "#E8AAB9"
-SECONDARY = "#F2C6D0"
+SECONDARY = "#FFEBEF"
 ACCENT_HOVER = SECONDARY
 ACCENT_PRESSED = "#D995A6"
 TEXT_ON_ACCENT = "#2B2226"
@@ -41,6 +41,19 @@ TEXT_DISABLED = "#7C757B"
 DANGER = "#E8808C"
 SUCCESS = "#8FC9A8"
 WARNING = "#E6C084"
+
+# ── Auth stage ──────────────────────────────────────────────────────────────
+# The split auth screen paints its own ground so the glow can sit behind the
+# poster fan; the values stay here so Phase 8 can re-tint the whole surface.
+AUTH_STAGE_TOP = "#2C252B"
+AUTH_STAGE_BOTTOM = "#222023"
+AUTH_PANE_TOP = "#2A272C"
+AUTH_PANE_BOTTOM = "#222023"
+AUTH_POSTER_DARK = "#3C3037"
+AUTH_POSTER_DARK_END = "#2A2328"
+AUTH_POSTER_WARM = "#3E3138"
+AUTH_POSTER_WARM_END = "#2A2227"
+SHADOW = "#000000"
 
 # ── Geometry ────────────────────────────────────────────────────────────────
 RADIUS_SM = 6
@@ -66,6 +79,7 @@ FONT_SIZE_LG = 16
 FONT_SIZE_XL = 20
 FONT_SIZE_H1 = 28
 FONT_SIZE_H2 = 22
+FONT_SIZE_DISPLAY = 34
 
 # ── Layout constants shared by chrome ───────────────────────────────────────
 TITLEBAR_HEIGHT = 42
@@ -192,6 +206,31 @@ QLabel[role="avatar"] {
     font-size: %(size_base)spx;
     font-weight: 700;
 }
+QLabel[role="authKicker"] {
+    color: %(accent)s;
+    font-size: %(size_xs)spx;
+    font-weight: 600;
+}
+QLabel[role="authDisplay"] {
+    color: %(text)s;
+    font-size: %(size_display)spx;
+    font-weight: 600;
+    letter-spacing: -0.6px;
+}
+QLabel[role="authDisplayAccent"] {
+    color: %(accent)s;
+    font-size: %(size_display)spx;
+    font-weight: 600;
+    letter-spacing: -0.6px;
+}
+QLabel[role="authLead"] {
+    color: %(text_secondary)s;
+    font-size: %(size_md)spx;
+}
+QLabel[role="warning"] {
+    color: %(warning)s;
+    font-size: %(size_sm)spx;
+}
 
 /* ── Surfaces ─────────────────────────────────────────────────────────── */
 QFrame[role="card"] {
@@ -250,6 +289,33 @@ QFrame[banner="info"] {
     background-color: %(accent_soft)s;
     border: 1px solid %(accent_soft_strong)s;
     border-radius: %(radius_md)spx;
+}
+QFrame[role="authPane"] {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 %(auth_pane_top)s, stop:1 %(auth_pane_bottom)s);
+    border: none;
+}
+QFrame[role="authPane"][split="true"] {
+    border-left: 1px solid %(border)s;
+}
+QFrame[role="authFooter"] {
+    background: transparent;
+    border-top: 1px solid %(border)s;
+}
+QFrame[role="segmented"] {
+    background-color: %(bg_input)s;
+    border: 1px solid %(border)s;
+    border-radius: %(radius_md)spx;
+}
+QFrame[role="segmentIndicator"] {
+    background-color: %(accent_soft)s;
+    border: 1px solid %(accent_soft_strong)s;
+    border-radius: %(radius_sm)spx;
+}
+QFrame[role="accentRule"] {
+    background-color: %(accent)s;
+    border: none;
+    border-radius: 2px;
 }
 QLabel[bannerText="error"] {
     color: %(danger)s;
@@ -354,6 +420,26 @@ QPushButton[variant="link"]:hover {
 }
 QPushButton[variant="link"]:pressed {
     color: %(accent_pressed)s;
+}
+
+QPushButton[variant="segment"] {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: %(radius_sm)spx;
+    color: %(text_muted)s;
+    padding: 7px 12px;
+    font-size: %(size_base)spx;
+    font-weight: 600;
+}
+QPushButton[variant="segment"][active="false"]:hover {
+    background-color: rgba(255, 255, 255, 0.03);
+    color: %(text)s;
+}
+QPushButton[variant="segment"][active="true"] {
+    color: %(text)s;
+}
+QPushButton[variant="segment"]:focus {
+    border-color: %(accent)s;
 }
 
 QPushButton[variant="icon"] {
@@ -470,6 +556,9 @@ QLineEdit:disabled {
 }
 QLineEdit::placeholder {
     color: %(text_muted)s;
+}
+QLineEdit[iconField="true"] {
+    padding: 0px;
 }
 
 QComboBox {
@@ -601,6 +690,8 @@ def build_stylesheet(primary: str | None = None, secondary: str | None = None) -
         "bg_elevated": BG_ELEVATED,
         "bg_input": BG_INPUT,
         "bg_input_focus": BG_INPUT_FOCUS,
+        "auth_pane_top": AUTH_PANE_TOP,
+        "auth_pane_bottom": AUTH_PANE_BOTTOM,
         "border": BORDER,
         "border_strong": BORDER_STRONG,
         "button_hover": "#4C474E",
@@ -620,6 +711,7 @@ def build_stylesheet(primary: str | None = None, secondary: str | None = None) -
         "success": SUCCESS,
         "success_soft": _rgba(SUCCESS, 0.12),
         "success_border": _rgba(SUCCESS, 0.35),
+        "warning": WARNING,
         "font": FONT_FAMILY,
         "size_xs": FONT_SIZE_XS,
         "size_sm": FONT_SIZE_SM,
@@ -628,6 +720,7 @@ def build_stylesheet(primary: str | None = None, secondary: str | None = None) -
         "size_lg": FONT_SIZE_LG,
         "size_h1": FONT_SIZE_H1,
         "size_h2": FONT_SIZE_H2,
+        "size_display": FONT_SIZE_DISPLAY,
         "radius_sm": RADIUS_SM,
         "radius_md": RADIUS_MD,
         "radius_lg": RADIUS_LG,
