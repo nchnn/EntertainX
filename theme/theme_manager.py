@@ -313,6 +313,23 @@ QPushButton[variant="primary"]:disabled {
     color: %(text_disabled)s;
 }
 
+QPushButton[variant="playDisc"] {
+    background-color: %(accent)s;
+    border: 1px solid %(accent_pressed)s;
+    border-radius: 19px;
+    padding: 0px;
+}
+QPushButton[variant="playDisc"]:hover {
+    background-color: %(accent_hover)s;
+    border-color: %(accent_hover)s;
+}
+QPushButton[variant="playDisc"]:pressed {
+    background-color: %(accent_pressed)s;
+}
+QPushButton[variant="playDisc"]:focus {
+    border: 2px solid %(on_accent)s;
+}
+
 QPushButton[variant="subtle"] {
     background-color: transparent;
     border: 1px solid %(border)s;

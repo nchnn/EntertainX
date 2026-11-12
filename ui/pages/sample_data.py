@@ -35,12 +35,12 @@ VIDEOS = [
 ]
 
 ALBUMS = [
-    {"title": "Soft Static", "artist": "Mira Vale", "tracks": "10 tracks"},
-    {"title": "Pink Hours", "artist": "The Lantern Club", "tracks": "8 tracks"},
-    {"title": "Grey Gardens EP", "artist": "Oskar Hale", "tracks": "5 tracks"},
-    {"title": "Low Tide", "artist": "Juno Park", "tracks": "12 tracks"},
-    {"title": "Night Bus", "artist": "Sable", "tracks": "9 tracks"},
-    {"title": "Paper Rooms", "artist": "Ivy & Ash", "tracks": "11 tracks"},
+    {"title": "Soft Static", "artist": "Mira Vale", "tracks": "10 tracks", "length": "3:42"},
+    {"title": "Pink Hours", "artist": "The Lantern Club", "tracks": "8 tracks", "length": "4:05"},
+    {"title": "Grey Gardens EP", "artist": "Oskar Hale", "tracks": "5 tracks", "length": "2:58"},
+    {"title": "Low Tide", "artist": "Juno Park", "tracks": "12 tracks", "length": "3:21"},
+    {"title": "Night Bus", "artist": "Sable", "tracks": "9 tracks", "length": "4:12"},
+    {"title": "Paper Rooms", "artist": "Ivy & Ash", "tracks": "11 tracks", "length": "3:36"},
 ]
 
 GAMES = [

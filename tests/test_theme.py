@@ -35,6 +35,7 @@ def test_stylesheet_contains_every_surface_and_variant():
         'QPushButton[variant="primary"]',
         'QPushButton[variant="nav"][active="true"]',
         'QPushButton[variant="tab"][active="true"]',
+        'QPushButton[variant="playDisc"]',
         'QFrame[role="card"]',
         'QFrame[role="mediaCard"]:hover',
         'QLineEdit:focus',

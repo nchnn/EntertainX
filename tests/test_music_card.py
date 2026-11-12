@@ -1,3 +1,5 @@
+import re
+
 import pytest
 from PySide6.QtCore import Qt
 
@@ -9,6 +11,7 @@ from ui.components.music_card import (
     duration_ms,
     format_duration,
 )
+from ui.pages.sample_data import ALBUMS
 
 
 def test_duration_parses_minutes_and_hours():
@@ -102,3 +105,7 @@ def test_missing_length_uses_three_minutes(app, length):
     card = MusicPlayerCard("A", "B", "1 track", length)
     assert card._track_ms == 180_000
     assert card._total_label.text() == "3:00"
+
+
+def test_every_album_has_a_valid_length():
+    assert all(re.fullmatch(r"\d+:\d{2}", album["length"]) for album in ALBUMS)
