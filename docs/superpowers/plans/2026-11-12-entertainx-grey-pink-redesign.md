@@ -40,11 +40,11 @@
 - [ ] Test `apply_theme` sets a non-empty `app.styleSheet()`.
 - [ ] Run `pytest tests/test_theme.py -q` → pass.
 
-### Task 2: Painted icon set
+### Task 2: Lucide icon set
 
-**Files:** Create `ui/components/__init__.py`, `ui/components/icons.py`; Test `tests/test_icons.py`.
+**Files:** Create `ui/components/__init__.py`, `ui/components/icons.py`, `assets/icons/*.svg`; Test `tests/test_icons.py`.
 
-**Interfaces:** `make_icon(name: str, color: str, size: int = 18, active_color: str | None = None) -> QIcon` for names `user`, `lock`, `eye`, `eye-off`, `search`, `play`, `star`, `plus`, `chevron`; `brand_pixmap(size: int) -> QPixmap`; `app_icon() -> QIcon`.
+**Interfaces:** `make_icon(name: str, color: str, size: int = 18, active_color: str | None = None) -> QIcon` for aliases `user`, `lock`, `mail`, `eye`, `eye-off`, `search`, `play`, `star`, `plus`, `chevron`, `list`, `film`, `music`, `gamepad`, `gear`, `logout`, `close`, `minimize`, `maximize`, `restore`, `check`; `brand_pixmap(size: int) -> QPixmap`; `app_icon() -> QIcon`.
 
 - [ ] Test each name returns a non-null `QIcon`; unknown name raises `KeyError`.
 - [ ] Test `app_icon()` pixmap is non-null at 16/32/64.

@@ -49,7 +49,9 @@ real content shells in every section so the polish is visible end to end.
 - `users` / `user_settings` schema unchanged. `auth_manager.AuthManager`
   public API (`register`, `login`, `logout`, `is_logged_in`, `current_user`)
   unchanged.
-- No icon files exist, so all icons are painted with `QPainter`.
+- UI icons are Lucide SVGs stored in `assets/icons/` (per `AGENTS.MD`) and
+  tinted at render time by `ui/components/icons.py`; no colour is baked into
+  an asset. The EntertainX mark itself is painted in code.
 - `GOAL.md` validation rules apply: username 3-20 alphanumeric, email with `@`
   and a dot in the domain, password min 6, generic login failure message.
 
@@ -102,7 +104,7 @@ data, not layout.
 - `theme/theme_manager.py` — tokens, `build_stylesheet()`, `apply_theme()`,
   `restyle()`.
 - `ui/frameless.py` — `TitleBar`, `FramelessWindow`, `BrandMark`.
-- `ui/components/` — painted icons, field widgets (`IconLineEdit`,
+- `ui/components/` - Lucide-backed icons, field widgets (`IconLineEdit`,
   `PasswordLineEdit`, `FormField`), surfaces (`Card`, `PageHeader`,
   `EmptyState`, `Badge`, `InlineBanner`), `MediaCard`/`CardGrid`.
 - `ui/login_window.py` — auth cards + Remember Me + validation UX.
