@@ -15,6 +15,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             email         TEXT    UNIQUE NOT NULL COLLATE NOCASE,
             password_hash BLOB    NOT NULL,
             salt          BLOB    NOT NULL,
+            role          TEXT    NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
             created_at    TEXT    NOT NULL DEFAULT (datetime('now'))
         );
         CREATE TABLE IF NOT EXISTS user_settings (
@@ -24,4 +25,10 @@ def init_db(conn: sqlite3.Connection) -> None:
             updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
         );
     """)
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
+    if "role" not in columns:
+        conn.execute(
+            "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'user' "
+            "CHECK (role IN ('user', 'admin'))"
+        )
     conn.commit()

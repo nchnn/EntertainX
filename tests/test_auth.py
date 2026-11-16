@@ -52,8 +52,10 @@ def test_login_success():
     ok, result = auth.login("alice", "StrongPass1!")
     assert ok is True
     assert result["username"] == "alice"
+    assert result["role"] == "user"
     assert auth.is_logged_in()
     assert auth.current_user["username"] == "alice"
+    assert auth.current_user["role"] == "user"
     conn.close()
 
 def test_login_wrong_password():

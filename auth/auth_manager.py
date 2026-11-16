@@ -98,17 +98,56 @@ class AuthManager:
 
     def login(self, username: str, password: str) -> tuple[bool, str | dict]:
         row = self._conn.execute(
-            "SELECT id, username, email, password_hash, salt FROM users WHERE username = ?",
+            "SELECT id, username, email, password_hash, salt, role FROM users WHERE username = ?",
             (username.strip(),),
         ).fetchone()
         if row is None:
             return False, "Invalid username or password"
-        uid, uname, email, stored_hash, salt = row
+        uid, uname, email, stored_hash, salt, role = row
         candidate = self._hash_password(password, salt)
         if not hmac.compare_digest(candidate, stored_hash):
             return False, "Invalid username or password"
-        self.current_user = {"id": uid, "username": uname, "email": email}
+        self.current_user = {"id": uid, "username": uname, "email": email, "role": role}
         return True, self.current_user
+
+    def _is_active_admin(self) -> bool:
+        return self.current_user is not None and self.current_user.get("role") == "admin"
+
+    def list_users(self) -> tuple[bool, list[dict] | str]:
+        if not self._is_active_admin():
+            return False, "Administrator access required"
+
+        rows = self._conn.execute(
+            "SELECT id, username, email, role, password_hash, created_at FROM users ORDER BY id"
+        ).fetchall()
+        return True, [
+            {
+                "id": user_id,
+                "username": username,
+                "email": email,
+                "role": role,
+                "password_hash_hex": password_hash.hex(),
+                "created_at": created_at,
+            }
+            for user_id, username, email, role, password_hash, created_at in rows
+        ]
+
+    def change_user_role(self, user_id: int, role: str) -> tuple[bool, str]:
+        if not self._is_active_admin():
+            return False, "Administrator access required"
+        if role not in ("user", "admin"):
+            return False, "Invalid role"
+        if self._conn.execute("SELECT 1 FROM users WHERE id = ?", (user_id,)).fetchone() is None:
+            return False, "User not found"
+        current_user = self.current_user
+        if current_user is None:
+            return False, "Administrator access required"
+        if user_id == current_user["id"]:
+            return False, "Administrators cannot change their own role"
+
+        self._conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+        self._conn.commit()
+        return True, "User role updated"
 
     def logout(self) -> None:
         self.current_user = None
