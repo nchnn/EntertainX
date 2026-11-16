@@ -142,3 +142,67 @@ def test_main_window_logout_reaches_callback():
     assert auth.logged_out
     assert calls == [True]
 
+
+
+def test_regular_sidebar_has_no_admin():
+    from ui.sidebar import Sidebar
+
+    sb = Sidebar("testuser", lambda c: None)
+    assert "Admin" not in sb._buttons
+
+
+def test_admin_sidebar_has_admin():
+    from ui.sidebar import Sidebar
+
+    sb = Sidebar("testuser", lambda c: None, is_admin=True)
+    assert "Admin" in sb._buttons
+
+
+def test_regular_content_area_has_no_admin():
+    from ui.content_area import ContentArea
+
+    ca = ContentArea(user={"id": 1, "username": "user", "role": "user"})
+    assert "Admin" not in ca._categories
+
+
+def test_admin_content_area_has_admin():
+    import sqlite3
+    from auth.auth_manager import AuthManager
+    from database.db import init_db
+    from ui.content_area import ContentArea
+
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    auth = AuthManager(conn)
+    auth.register("admin", "admin@test.com", "AdminPass1!")
+    conn.execute("UPDATE users SET role = 'admin' WHERE username = 'admin'")
+    conn.commit()
+    auth.login("admin", "AdminPass1!")
+
+    ca = ContentArea(
+        user={"id": 1, "username": "admin", "role": "admin"},
+        auth_manager=auth,
+    )
+    assert "Admin" in ca._categories
+    conn.close()
+
+
+def test_admin_main_window_has_admin_sidebar_and_content():
+    import sqlite3
+    from auth.auth_manager import AuthManager
+    from database.db import init_db
+    from ui.main_window import MainWindow
+
+    conn = sqlite3.connect(":memory:")
+    init_db(conn)
+    auth = AuthManager(conn)
+    auth.register("admin", "admin@test.com", "AdminPass1!")
+    conn.execute("UPDATE users SET role = 'admin' WHERE username = 'admin'")
+    conn.commit()
+    auth.login("admin", "AdminPass1!")
+
+    user = auth.current_user
+    window = MainWindow(auth, user, on_logout=lambda: None)
+    assert "Admin" in window.sidebar._buttons
+    assert "Admin" in window.content._categories
+    conn.close()

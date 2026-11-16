@@ -54,6 +54,7 @@ _SLUGS = {
     "maximize": "square",
     "restore": "copy",
     "check": "check",
+    "shield": "shield",
 }
 
 

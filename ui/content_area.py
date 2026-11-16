@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (
 
 from theme import theme_manager as theme
 
+from auth.auth_manager import AuthManager
+
 from ui.pages.video_youtube import YouTubePage
 from ui.pages.video_movies import MoviesPage
 from ui.pages.video_tvshows import TVShowsPage
@@ -27,10 +29,12 @@ class ContentArea(QWidget):
     def __init__(
         self,
         user: dict | None = None,
+        auth_manager: AuthManager | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._user = user or {}
+        self._auth = auth_manager
         self._last_tab: dict[str, int] = {}
         self._current_cat = ""
         self._tab_buttons: list[QPushButton] = []
@@ -58,6 +62,14 @@ class ContentArea(QWidget):
                 ("Settings", SettingsPage(user=self._user)),
             ],
         }
+
+        # Admin page — visible only when the session has the admin role
+        if self._user.get("role") == "admin" and self._auth is not None:
+            from ui.pages.admin import AdminPage
+
+            self._categories["Admin"] = [
+                ("Admin", AdminPage(auth_manager=self._auth)),
+            ]
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)

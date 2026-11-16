@@ -614,6 +614,41 @@ QCheckBox::indicator:checked {
     image: url("%(check_icon)s");
 }
 
+/* ── Table ────────────────────────────────────────────────────────────── */
+QTableWidget {
+    background-color: %(bg_card)s;
+    color: %(text)s;
+    border: 1px solid %(border)s;
+    border-radius: %(radius_md)spx;
+    gridline-color: %(border)s;
+    selection-background-color: %(accent_soft)s;
+    selection-color: %(text)s;
+    font-size: %(size_sm)spx;
+}
+QTableWidget::item {
+    padding: 6px 10px;
+}
+QTableWidget::item:selected {
+    background-color: %(accent_soft)s;
+    color: %(text)s;
+}
+QTableWidget::item:alternate {
+    background-color: %(bg_elevated)s;
+}
+QHeaderView::section {
+    background-color: %(bg_sidebar)s;
+    color: %(text_secondary)s;
+    border: none;
+    border-bottom: 1px solid %(border)s;
+    border-right: 1px solid %(border)s;
+    padding: 8px 10px;
+    font-size: %(size_sm)spx;
+    font-weight: 600;
+}
+QHeaderView::section:last {
+    border-right: none;
+}
+
 /* ── Scrollbars ───────────────────────────────────────────────────────── */
 QScrollBar:vertical {
     background: transparent;

@@ -27,11 +27,12 @@ class MainWindow(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        self._content = ContentArea(user=user)
+        self._content = ContentArea(user=user, auth_manager=auth_manager)
         self._sidebar = Sidebar(
             username=user["username"],
             on_category=self._content.show_category,
             on_logout=self._do_logout,
+            is_admin=user.get("role") == "admin",
         )
 
         layout.addWidget(self._sidebar)

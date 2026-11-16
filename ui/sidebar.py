@@ -17,7 +17,8 @@ from theme import theme_manager as theme
 from ui.components.icons import make_icon
 from ui.components.surfaces import Divider, ElidedLabel, label
 
-CATEGORIES = ["Video", "Music", "Games", "My Lists", "Settings"]
+_BASE_CATEGORIES = ["Video", "Music", "Games", "My Lists", "Settings"]
+CATEGORIES = _BASE_CATEGORIES  # kept for backward compatibility
 
 _ICONS = {
     "Video": "film",
@@ -25,6 +26,7 @@ _ICONS = {
     "Games": "gamepad",
     "My Lists": "list",
     "Settings": "gear",
+    "Admin": "shield",
 }
 
 
@@ -40,6 +42,7 @@ class Sidebar(QWidget):
         username: str,
         on_category: Callable[[str], None],
         on_logout: Callable[[], None] | None = None,
+        is_admin: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -54,6 +57,11 @@ class Sidebar(QWidget):
         self._group.setExclusive(True)
         self.logout_button: QPushButton | None = None
 
+        # Build category list: admins get the Admin item appended.
+        categories = list(_BASE_CATEGORIES)
+        if is_admin:
+            categories.append("Admin")
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -63,7 +71,7 @@ class Sidebar(QWidget):
             theme.SPACE_MD, theme.SPACE_XL, theme.SPACE_MD, theme.SPACE_MD
         )
         nav.setSpacing(theme.SPACE_XS)
-        for category in CATEGORIES:
+        for category in categories:
             button = self._build_nav_button(category)
             self._group.addButton(button)
             self._buttons[category] = button
