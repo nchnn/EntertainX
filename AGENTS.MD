@@ -4,11 +4,20 @@
 EntertainX is a multi-category entertainment desktop app built with PySide6 (Qt for Python).  
 It includes three main sections (Movies & TV Shows, Music, and Games) under a single unified interface, with user authentication, ratings, personal lists, and full custom theming.
 
+## Document Hierarchy
+
+| Document | Purpose | When to Read |
+|---|---|---|
+| `GOAL.md` | Compact working summary: requirements, checklist, score | **Auto-loaded** — always available; treat as the daily driver |
+| `GOAL_SPEC.md` | Full architectural specification: DDL, security, module contracts, acceptance matrix | **On-demand** — read only the relevant section when implementing or verifying a specific feature |
+
+> **Token Efficiency Rule:** Never read `GOAL_SPEC.md` in full. When a task requires detailed specs (e.g., database schema, security parameters, UI component contracts), read only the specific section needed (e.g., `GOAL_SPEC.md §5.2` for DDL, `§7.4` for Music module). `GOAL.md` contains everything needed for routine decisions.
+
 ## Core Principles
-- Follow `GOAL.md` as the single source of truth
+- `GOAL.md` is the single source of truth for requirements and progress
 - Keep the three sections feeling like one cohesive application
 - Prefer clean, readable, and maintainable code
-- APIs are flexible — choose reliable free options
+- APIs are flexible — choose reliable free options (strict $0 cost)
 - Never hardcode secrets or store plain-text passwords
 
 ## Development Guidelines
@@ -17,6 +26,7 @@ It includes three main sections (Movies & TV Shows, Music, and Games) under a si
 - Handle API failures and loading states gracefully
 - Maintain visual consistency across Movies, Music, and Games sections
 - Save user preferences (theme colors + mode) in the database
+- All network calls on background threads — never block the Qt main thread
 
 ## Icons
 - Source of truth: <https://lucide.dev/icons/> (Lucide). Never invent an icon name or recall one from memory.
@@ -38,7 +48,7 @@ It includes three main sections (Movies & TV Shows, Music, and Games) under a si
 - Brand marks are trademarks: use them to refer to that brand (provider pills, catalogue badges), never as UI controls. Check the page's `license` field — many are `CC0-1.0` but some are `Fair use`, and the `guidelines` URL links the owner's asset rules.
 
 ## Key Directories
-- `api/` → One file per domain (movies.py, music.py, games.py)
+- `api/` → One adapter per domain (movies.py, music.py, games.py)
 - `assets/icons/` → Lucide SVG icons (see Icons)
 - `assets/brands/` → Third-party brand logos by slug (see Brand Logos)
 - `ui/` → Organized by section + shared components
@@ -47,11 +57,13 @@ It includes three main sections (Movies & TV Shows, Music, and Games) under a si
 - `auth/` → Login, register, password hashing
 
 ## When Implementing Features
-1. Check the relevant section in GOAL.md
-2. Implement cleanly
-3. Test the feature
-4. Ensure it matches the overall design language
-5. Move to the next feature
+1. Check the relevant requirement in `GOAL.md`
+2. If detailed specs are needed, read only the matching section in `GOAL_SPEC.md`
+3. Implement cleanly
+4. Test the feature
+5. Ensure it matches the overall design language
+6. Update the checklist in `GOAL.md` (mark `[x]` when done)
+7. Move to the next feature
 
 ## Definition of Done
-Do not mark the project as complete until the score in GOAL.md reaches ≥ 92 and all checklist items are satisfied.
+Do not mark the project as complete until the score in `GOAL.md` reaches ≥ 92 and all checklist items are satisfied.
