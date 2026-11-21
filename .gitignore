@@ -1,19 +1,61 @@
+# Python & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# Virtual Environments
 venv/
+.venv/
+env/
+ENV/
+
+# Environment & Secrets
 .env
 .env.*
 !.env.example
-__pycache__/
-*.pyc
+
+# SQLite Databases & Local Storage
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Testing & Coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.cache/
+
+# Build & Packaging (PyInstaller, PySide6-deploy, Setuptools)
+build/
+dist/
+*.spec
+*.egg-info/
+*.egg
+
+# IDEs & Editor Tooling
 .idea/
 .vscode/
+.cursor/
 .superpowers/
 .impeccable/
+.kilo/
+.claude/
+*.swp
+*.swo
+*~
 
-# Generated output
-design_system_output.txt
-.claude/skills/ui-ux-pro-max/design_system.md
-
-# OS / logs
-Thumbs.db
-desktop.ini
+# Generated Output & Logs
 *.log
+design_system_output.txt
+
+# Operating System Files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+desktop.ini
