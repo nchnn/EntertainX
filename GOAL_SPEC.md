@@ -21,7 +21,7 @@ The instructional intent within ITL313-18 is guiding student engineers from isol
 6. **Stateful Dynamic Styling Architecture:** Creating a tokenized Qt Style Sheet (QSS) system enabling users to customize primary/secondary theme colors via native color dialogs, persisting settings across user sessions.
 
 ### 1.2 Document Authority and Hierarchy
-Within the EntertainX software repository, this document represents the single source of truth (`SSOT`). All planning documents, including implementation checklists, task tracking trackers (`TASKS.md`), developer guidelines (`AGENTS.md`), and automated integration test suites, derive their acceptance criteria and verification metrics directly from the statements, schemas, tables, and constraints detailed herein.
+Within the EntertainX software repository, this document represents the single source of truth (`SSOT`). All planning documents, including implementation checklists, task tracking trackers (`TASKS.md`), and developer guidelines (`AGENTS.md`), derive their acceptance criteria and verification metrics directly from the statements, schemas, tables, and constraints detailed herein.
 
 Where discrepancies arise, this document prevails. Modifications require formal architectural review and owner sign-off. Developers and agents must not unilaterally dilute, bypass, or delete core requirements, such as in-GUI gameplay or the zero-cost mandate.
 
@@ -449,11 +449,10 @@ To guarantee a responsive user interface that never blocks:
 Development proceeds systematically through eight distinct phases:
 
 ### Phase 1: Environment Setup, Database Architecture, and Salted Authentication (Complete)
-- Configured Python 3.12 virtual environment (`venv`) with PySide6 and testing dependencies.
+- Configured Python 3.12 virtual environment (`venv`) with PySide6.
 - Implemented `database/db.py` with foreign key enforcement and automatic schema creation.
 - Built `auth/auth_manager.py` implementing PBKDF2-HMAC-SHA256 password hashing with 32-byte salts and constant-time verification.
 - Developed `ui/login_window.py` featuring tabbed registration and login forms with full input validation.
-- Validated with unit tests in `tests/test_db.py` and `tests/test_auth.py`.
 
 ### Phase 2: Unified Main Navigation Shell, Sidebar, and Sub-Tab Stacks (Complete)
 - Implemented `ui/main_window.py` providing the master application shell.
@@ -461,7 +460,6 @@ Development proceeds systematically through eight distinct phases:
 - Developed `ui/content_area.py` featuring a dynamic sub-tab navigation bar and `QStackedWidget` viewport.
 - Created styled placeholder pages for all future functional modules.
 - Created initial `theme/theme_manager.py` with base tokenized dark QSS.
-- Validated navigation transitions with automated tests in `tests/test_navigation.py`.
 
 ### Phase 3: Movies and TV Shows API Adapter and Browsing UI
 - Implement `api/movies.py` connecting to TMDB or TVMaze API with polite rate-limiting.
@@ -495,7 +493,7 @@ Development proceeds systematically through eight distinct phases:
 - Implement full `QColorDialog` interactive color pickers in `ui/pages/settings.py`.
 - Build dynamic QSS compilation engine supporting custom Primary and Secondary colors.
 - Add Dark Mode and Light Mode switching with contrast ratio validation.
-- Conduct complete integration testing, security scanning, and documentation finalization.
+- Conduct complete security scanning and documentation finalization.
 
 ---
 
@@ -575,34 +573,14 @@ EntertainX must achieve an evaluation score of **≥ 92 out of 100 points** to s
 | **6. Shared Personal Lists System** | 8 | 8 | Cross-category unified library, Favorites, Watchlist, Completed, SQLite persistence. |
 | **7. Dynamic Custom Theming** | 10 | 10 | Primary/Secondary color selection, QColorDialog, Dark/Light modes, runtime QSS recompile. |
 | **8. UI/UX Polish & Consistency** | 8 | 7 | Asynchronous worker threads, loading states, empty states, error handling, modern typography. |
-| **9. Code Quality & Architecture** | 6 | 6 | Clean directory structure, adapter pattern, reusable widgets, tests passing, `.env.example`. |
+| **9. Code Quality & Architecture** | 6 | 6 | Clean directory structure, adapter pattern, reusable widgets, `.env.example`. |
 | **Total Evaluation Score** | **100** | **≥ 92** | **Project Certification Threshold: ≥ 92 Points** |
 
 ---
 
-## 12. Quality Assurance, Automated Testing, and Verification Plan
+## 12. Risk Assessment, Contingency Management, and Project Approval
 
-EntertainX maintains a quality assurance regimen combining automated unit tests, headless GUI verification, and acceptance checks.
-
-### 12.1 Automated Test Suites (`tests/`)
-1. `tests/test_db.py`: Validates SQLite database initialization, table creation, foreign key enforcement, unique constraints, and schema idempotency.
-2. `tests/test_auth.py`: Tests password hashing, salt uniqueness, successful registration, duplicate rejection, valid login, invalid login rejection, and session state persistence.
-3. `tests/test_navigation.py`: Uses `pytest-qt` to verify headless sidebar clicks, category switching, sub-tab transitions, category history memory, and logout signal dispatching.
-4. `tests/test_api_adapters.py`: Tests API adapter response mapping, HTTP timeout handling, and fallback behavior using mocked network payloads.
-5. `tests/test_theming.py`: Verifies QSS template compilation, token substitution, color validation, and database setting restoration.
-6. `tests/test_lists.py`: Validates cross-category library insertions, duplicate prevention, and deletion cascades.
-
-### 12.2 Execution Command
-Execute tests via pytest runner:
-```bash
-pytest -v --tb=short tests/
-```
-
----
-
-## 13. Risk Assessment, Contingency Management, and Project Approval
-
-### 13.1 Technical Risk Matrix
+### 12.1 Technical Risk Matrix
 - **Risk 1: External API Deprecation or Outage:** A selected free API provider abruptly modifies its endpoint schema or experiences server downtime.
   * *Mitigation:* API adapters encapsulate all provider-specific parsing. If an API becomes permanently unavailable, a replacement zero-cost adapter can be plugged in without altering GUI or database code.
 - **Risk 2: Rate Limit Exhaustion During Evaluation:** Multiple rapid test runs exceed public API hourly request quotas.
@@ -610,5 +588,5 @@ pytest -v --tb=short tests/
 - **Risk 3: WebEngine Dependency Overhead:** Some Windows environments may lack Chromium runtime dependencies required by `QWebEngineView`.
   * *Mitigation:* The playable game architecture supports both embedded WebEngine games and pure native Qt interactive canvas implementations.
 
-### 13.2 Final Sign-Off and Commitment
+### 12.2 Final Sign-Off and Commitment
 EntertainX represents software engineering excellence, user privacy, and academic rigor, delivering a cohesive multi-media desktop application that fulfills all capstone requirements for ITL313-18.

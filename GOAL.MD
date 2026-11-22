@@ -61,7 +61,6 @@
 | `ui/` | Main window, sidebar, content area |
 | `ui/pages/` | Feature pages (video, music, games, lists, settings) |
 | `ui/components/` | Reusable widgets (ContentCard, StarRating, SearchBar, etc.) |
-| `tests/` | pytest suites |
 
 **Database tables:** `users`, `user_settings`, `library_items`, `user_ratings`, `game_sessions`
 
@@ -139,7 +138,6 @@
 - [ ] Clean modular architecture
 - [ ] Reusable UI components
 - [ ] No hardcoded secrets; `.env.example` present
-- [ ] Automated test suites passing
 
 ---
 

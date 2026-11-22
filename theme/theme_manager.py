@@ -12,6 +12,7 @@ without touching a single widget.
 
 from __future__ import annotations
 
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QWidget
 
 # ── Surfaces ────────────────────────────────────────────────────────────────
@@ -71,6 +72,10 @@ SPACE_XXL = 32
 
 # ── Typography ──────────────────────────────────────────────────────────────
 FONT_FAMILY = '"Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif'
+# Editorial serif for hero lines and form titles. Georgia ships with Windows
+# and macOS, so the display type costs no bundled font file.
+FONT_DISPLAY = 'Georgia, "Palatino Linotype", Cambria, "Times New Roman", serif'
+FONT_DISPLAY_FAMILIES = ("Georgia", "Palatino Linotype", "Cambria", "Times New Roman")
 FONT_SIZE_XS = 11
 FONT_SIZE_SM = 12
 FONT_SIZE_BASE = 13
@@ -80,6 +85,8 @@ FONT_SIZE_XL = 20
 FONT_SIZE_H1 = 28
 FONT_SIZE_H2 = 22
 FONT_SIZE_DISPLAY = 34
+FONT_SIZE_AUTH_TITLE = 32
+FONT_SIZE_AUTH_HEADLINE = 42
 
 # ── Layout constants shared by chrome ───────────────────────────────────────
 TITLEBAR_HEIGHT = 42
@@ -98,6 +105,31 @@ def _rgba(color: str, alpha: float) -> str:
         return color
     r, g, b = (int(color[i : i + 2], 16) for i in (1, 3, 5))
     return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+def mix_hex(first: str, second: str, share: float) -> str:
+    """Blend two ``#rrggbb`` colours; ``share`` is how much of ``second``."""
+    if not (first.startswith("#") and len(first) == 7):
+        return first
+    if not (second.startswith("#") and len(second) == 7):
+        return first
+    share = max(0.0, min(1.0, share))
+    a = [int(first[i : i + 2], 16) for i in (1, 3, 5)]
+    b = [int(second[i : i + 2], 16) for i in (1, 3, 5)]
+    return "#{:02x}{:02x}{:02x}".format(
+        *(round(x + (y - x) * share) for x, y in zip(a, b))
+    )
+
+
+def display_font(pixel_size: int, italic: bool = False) -> QFont:
+    """The editorial serif at ``pixel_size``, for widgets that paint their own text."""
+    font = QFont()
+    font.setFamilies(list(FONT_DISPLAY_FAMILIES))
+    font.setStyleHint(QFont.StyleHint.Serif)
+    font.setPixelSize(pixel_size)
+    font.setWeight(QFont.Weight.Normal)
+    font.setItalic(italic)
+    return font
 
 
 _QSS_TEMPLATE = """
@@ -226,6 +258,36 @@ QLabel[role="authDisplayAccent"] {
 QLabel[role="authLead"] {
     color: %(text_secondary)s;
     font-size: %(size_md)spx;
+}
+QLabel[role="authEyebrow"] {
+    color: %(accent)s;
+    font-size: %(size_xs)spx;
+    font-weight: 700;
+}
+QLabel[role="authTitle"] {
+    color: %(text)s;
+    font-family: %(font_display)s;
+    font-size: %(size_auth_title)spx;
+    font-weight: 400;
+}
+QLabel[role="authSupport"] {
+    color: %(text_muted)s;
+    font-size: %(size_base)spx;
+}
+QLabel[role="authHeadline"] {
+    color: %(text)s;
+    font-family: %(font_display)s;
+    font-size: %(size_auth_headline)spx;
+    font-weight: 400;
+}
+QLabel[role="featureTitle"] {
+    color: %(text)s;
+    font-size: %(size_base)spx;
+    font-weight: 600;
+}
+QLabel[role="featureCaption"] {
+    color: %(text_muted)s;
+    font-size: %(size_xs)spx;
 }
 QLabel[role="warning"] {
     color: %(warning)s;
@@ -377,6 +439,30 @@ QPushButton[variant="primary"]:disabled {
     background-color: %(bg_elevated)s;
     border-color: %(bg_elevated)s;
     color: %(text_disabled)s;
+}
+
+/* The auth screens' submit button: a soft vertical sheen on the accent. */
+QPushButton[variant="hero"] {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 %(accent_light)s, stop:1 %(accent)s);
+    color: %(on_accent)s;
+    border: 1px solid %(accent)s;
+    border-radius: %(radius_md)spx;
+    font-size: %(size_md)spx;
+    font-weight: 600;
+    padding: 12px 18px;
+}
+QPushButton[variant="hero"]:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 %(accent_hover)s, stop:1 %(accent_light)s);
+    border-color: %(accent_light)s;
+}
+QPushButton[variant="hero"]:pressed {
+    background: %(accent_pressed)s;
+    border-color: %(accent_pressed)s;
+}
+QPushButton[variant="hero"]:focus {
+    border: 1px solid %(text)s;
 }
 
 QPushButton[variant="playDisc"] {
@@ -560,6 +646,15 @@ QLineEdit::placeholder {
 QLineEdit[iconField="true"] {
     padding: 0px;
 }
+/* Icon fields draw their own animated focus edge (see ui/components/fields.py),
+   so QSS only lifts the background here instead of switching the border. */
+QLineEdit[iconField="true"]:focus {
+    border: 1px solid %(border_strong)s;
+    background-color: %(bg_input_focus)s;
+}
+QLineEdit[iconField="true"][error="true"]:focus {
+    border: 1px solid %(danger)s;
+}
 
 QComboBox {
     background-color: %(bg_input)s;
@@ -732,6 +827,7 @@ def build_stylesheet(primary: str | None = None, secondary: str | None = None) -
         "button_hover": "#4C474E",
         "accent": accent,
         "accent_hover": accent_hover,
+        "accent_light": mix_hex(accent, "#FFFFFF", 0.2),
         "accent_pressed": ACCENT_PRESSED,
         "accent_soft": _rgba(accent, 0.16),
         "accent_soft_strong": _rgba(accent, 0.30),
@@ -748,6 +844,7 @@ def build_stylesheet(primary: str | None = None, secondary: str | None = None) -
         "success_border": _rgba(SUCCESS, 0.35),
         "warning": WARNING,
         "font": FONT_FAMILY,
+        "font_display": FONT_DISPLAY,
         "size_xs": FONT_SIZE_XS,
         "size_sm": FONT_SIZE_SM,
         "size_base": FONT_SIZE_BASE,
@@ -756,6 +853,8 @@ def build_stylesheet(primary: str | None = None, secondary: str | None = None) -
         "size_h1": FONT_SIZE_H1,
         "size_h2": FONT_SIZE_H2,
         "size_display": FONT_SIZE_DISPLAY,
+        "size_auth_title": FONT_SIZE_AUTH_TITLE,
+        "size_auth_headline": FONT_SIZE_AUTH_HEADLINE,
         "radius_sm": RADIUS_SM,
         "radius_md": RADIUS_MD,
         "radius_lg": RADIUS_LG,

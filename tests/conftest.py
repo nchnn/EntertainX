@@ -1,9 +1,13 @@
 import os
 import sys
+import time
 
 import pytest
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+# Animations are exercised in tests/test_motion.py; everywhere else they would
+# only slow the suite down, so the helpers apply their end state immediately.
+os.environ.setdefault("ENTERTAINX_REDUCE_MOTION", "1")
 
 from PySide6.QtWidgets import QApplication
 
@@ -15,6 +19,27 @@ def app():
     instance = QApplication.instance() or QApplication(sys.argv)
     apply_theme(instance)
     return instance
+
+
+@pytest.fixture()
+def wait_for(app):
+    """Pump the event loop until ``condition()`` holds.
+
+    Sign-in and registration hash their password on a worker thread and report
+    back through a queued signal, so tests wait for the result instead of
+    reading it straight after the click.
+    """
+
+    def wait(condition, timeout: float = 10.0) -> bool:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            app.processEvents()
+            if condition():
+                return True
+            time.sleep(0.005)
+        return bool(condition())
+
+    return wait
 
 
 @pytest.fixture()

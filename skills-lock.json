@@ -7,13 +7,6 @@
       "skillPath": ".agents/skills/impeccable/SKILL.md",
       "computedHash": "86e265bf3df79c65215f7244d71892ca278370d56dec47a8cc15e8373db3f714",
       "installMode": "copy"
-    },
-    "ui-ux-pro-max": {
-      "source": "nextlevelbuilder/ui-ux-pro-max-skill",
-      "sourceType": "github",
-      "skillPath": ".claude/skills/ui-ux-pro-max/SKILL.md",
-      "computedHash": "ad0fde209f1830bdf4f212eb8c32f03a860b989e6e4af4b1f334be83f7bb97bc",
-      "installMode": "copy"
     }
   }
 }

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import re
 
-from PySide6.QtCore import QEvent, QRect, QRectF, Qt
-from PySide6.QtGui import QColor, QIcon, QPainter
+from PySide6.QtCore import QEasingCurve, QEvent, QRect, QRectF, Qt, QVariantAnimation
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 
 from theme import theme_manager as theme
+from ui.components import motion
 from ui.components.icons import make_icon
 
 ICON_SIZE = 18
@@ -61,6 +62,13 @@ class IconLineEdit(QLineEdit):
             self._leading_action = action
         self._apply_text_margins()
 
+        # The accent edge eases in on focus; QSS can only switch it instantly.
+        self._focus_level = 0.0
+        self._focus_anim = QVariantAnimation(self)
+        self._focus_anim.setDuration(180)
+        self._focus_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._focus_anim.valueChanged.connect(self._set_focus_level)
+
     # ── Painting ────────────────────────────────────────────────────────────
     def _apply_text_margins(self) -> None:
         left = TEXT_INSET if self._icon_idle is not None else 12
@@ -71,14 +79,55 @@ class IconLineEdit(QLineEdit):
             ICON_INSET, (self.height() - ICON_SIZE) // 2, ICON_SIZE, ICON_SIZE
         )
 
+    def _set_focus_level(self, value) -> None:
+        self._focus_level = float(value)
+        self.update()
+
+    def _glide_focus(self, target: float) -> None:
+        self._focus_anim.stop()
+        if not motion.motion_enabled() or not self.isVisible():
+            self._set_focus_level(target)
+            return
+        self._focus_anim.setStartValue(self._focus_level)
+        self._focus_anim.setEndValue(target)
+        self._focus_anim.start()
+
+    def focusInEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        super().focusInEvent(event)
+        self._glide_focus(1.0)
+
+    def focusOutEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        super().focusOutEvent(event)
+        self._glide_focus(0.0)
+
+    def _paint_focus_edge(self, painter: QPainter) -> None:
+        level = self._focus_level
+        if level <= 0.0:
+            return
+        color = QColor(theme.DANGER if self.property("error") else theme.PRIMARY)
+        radius = float(theme.RADIUS_MD)
+        edge = QRectF(self.rect()).adjusted(0.5, 0.5, -0.5, -0.5)
+
+        glow = QColor(color)
+        glow.setAlphaF(0.16 * level)
+        painter.setPen(QPen(glow, 3.0))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRoundedRect(edge.adjusted(1.5, 1.5, -1.5, -1.5), radius - 1, radius - 1)
+
+        line = QColor(color)
+        line.setAlphaF(level)
+        painter.setPen(QPen(line, 1.0))
+        painter.drawRoundedRect(edge, radius, radius)
+
     def paintEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         super().paintEvent(event)
-        if self._icon_idle is None:
-            return
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
-        icon: QIcon = self._icon_active if self.hasFocus() else self._icon_idle
-        icon.paint(painter, self._leading_icon_rect())
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        self._paint_focus_edge(painter)
+        if self._icon_idle is not None:
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+            icon: QIcon = self._icon_active if self.hasFocus() else self._icon_idle
+            icon.paint(painter, self._leading_icon_rect())
         painter.end()
 
 

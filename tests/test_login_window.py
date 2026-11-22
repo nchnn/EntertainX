@@ -1,8 +1,10 @@
+import threading
+
 from ui.login_window import LoginWindow
 
 
-def _window(auth, prefs, on_success=None):
-    return LoginWindow(auth, on_success or (lambda user: None), preferences=prefs)
+def _window(auth, prefs, on_success=None, **kwargs):
+    return LoginWindow(auth, on_success or (lambda user: None), preferences=prefs, **kwargs)
 
 
 def _fill_register(window, username, email, password, confirm=None):
@@ -12,10 +14,16 @@ def _fill_register(window, username, email, password, confirm=None):
     window._reg_confirm.setText(password if confirm is None else confirm)
 
 
+def _idle(window):
+    """Condition: no sign-in or registration is in flight."""
+    return lambda: not window._busy
+
+
 def test_login_page_is_default(auth_env, app):
     auth, prefs = auth_env
     window = _window(auth, prefs)
     assert window.current_page() == 0
+    assert window._pages_layout.currentWidget() is window._login_card
     assert not window._login_card.isHidden()
 
 
@@ -28,34 +36,36 @@ def test_login_requires_username(auth_env, app):
     assert window._login_error.isHidden()
 
 
-def test_registration_lands_on_login_with_success_banner(auth_env, app):
+def test_registration_lands_on_login_with_success_banner(auth_env, app, wait_for):
     auth, prefs = auth_env
     window = _window(auth, prefs)
 
     window._go_register()
     assert window.current_page() == 1
+    assert window._pages_layout.currentWidget() is window._register_card
     _fill_register(window, "newuser", "new@example.com", "secret123")
     window._do_register()
+    assert wait_for(lambda: window.current_page() == 0)
 
-    assert window.current_page() == 0
     assert not window._login_success.isHidden()
     assert "newuser" in window._login_success.text
     assert window._login_user.text() == "newuser"
     assert window._reg_user.text() == ""
+    assert not window._busy
     assert window._register_button.isEnabled()
-    assert not window._login_button.isHidden()
+    assert window._pages_layout.currentWidget() is window._login_card
 
 
 def test_registration_highlights_every_invalid_field(auth_env, app):
     auth, prefs = auth_env
     calls = []
-    original = auth.register
+    original = auth.hash_credentials
 
     def spy(*args, **kwargs):
         calls.append(args)
         return original(*args, **kwargs)
 
-    auth.register = spy
+    auth.hash_credentials = spy
     window = _window(auth, prefs)
     window._go_register()
     _fill_register(window, "ab", "nope", "123", confirm="456")
@@ -69,7 +79,7 @@ def test_registration_highlights_every_invalid_field(auth_env, app):
     assert not window._busy
 
 
-def test_registration_reports_taken_username_on_the_field(auth_env, app):
+def test_registration_reports_taken_username_on_the_field(auth_env, app, wait_for):
     auth, prefs = auth_env
     assert auth.register("taken", "taken@example.com", "secret123")[0]
 
@@ -77,13 +87,14 @@ def test_registration_reports_taken_username_on_the_field(auth_env, app):
     window._go_register()
     _fill_register(window, "taken", "other@example.com", "secret123")
     window._do_register()
+    assert wait_for(_idle(window))
 
     assert window.current_page() == 1
     assert window._reg_user_field.has_error
     assert "username" in window._reg_user_field._message.text().lower()
 
 
-def test_failed_login_shows_generic_error(auth_env, app):
+def test_failed_login_shows_generic_error(auth_env, app, wait_for):
     auth, prefs = auth_env
     assert auth.register("chris", "chris@example.com", "secret123")[0]
 
@@ -91,13 +102,26 @@ def test_failed_login_shows_generic_error(auth_env, app):
     window._login_user.setText("chris")
     window._login_pass.setText("wrong-password")
     window._do_login()
+    assert wait_for(_idle(window))
 
     assert not window._login_error.isHidden()
     assert window._login_error.text == "Invalid username or password"
     assert window._pass_field.has_error
+    assert window._login_button.state == window._login_button.IDLE
 
 
-def test_failed_login_error_clears_when_the_password_is_retried(auth_env, app):
+def test_unknown_user_gets_the_same_generic_error(auth_env, app, wait_for):
+    auth, prefs = auth_env
+    window = _window(auth, prefs)
+    window._login_user.setText("ghost")
+    window._login_pass.setText("whatever1")
+    window._do_login()
+    assert wait_for(_idle(window))
+
+    assert window._login_error.text == "Invalid username or password"
+
+
+def test_failed_login_error_clears_when_the_password_is_retried(auth_env, app, wait_for):
     auth, prefs = auth_env
     assert auth.register("chris", "chris@example.com", "secret123")[0]
 
@@ -105,10 +129,35 @@ def test_failed_login_error_clears_when_the_password_is_retried(auth_env, app):
     window._login_user.setText("chris")
     window._login_pass.setText("wrong-password")
     window._do_login()
+    assert wait_for(_idle(window))
     assert window._pass_field.has_error
 
     window._login_pass.setText("")
     assert not window._pass_field.has_error
+
+
+def test_password_hashing_runs_off_the_gui_thread(auth_env, app, wait_for):
+    auth, prefs = auth_env
+    assert auth.register("chris", "chris@example.com", "secret123")[0]
+
+    threads = []
+    original = auth.verify_login
+
+    def spy(record, password):
+        threads.append(threading.current_thread())
+        return original(record, password)
+
+    auth.verify_login = spy
+    signed_in = []
+    window = _window(auth, prefs, signed_in.append)
+    window._login_user.setText("chris")
+    window._login_pass.setText("secret123")
+    window._do_login()
+    assert window._busy  # the form is already in its loading state
+    assert wait_for(lambda: bool(signed_in))
+
+    assert threads[0] is not threading.main_thread()
+    assert signed_in[0]["username"] == "chris"
 
 
 def test_password_toggles_are_independent(auth_env, app):
@@ -130,7 +179,7 @@ def test_password_toggles_are_independent(auth_env, app):
     assert window._reg_confirm.is_password_visible()
 
 
-def test_registration_resets_password_visibility(auth_env, app):
+def test_registration_resets_password_visibility(auth_env, app, wait_for):
     auth, prefs = auth_env
     window = _window(auth, prefs)
     window._go_register()
@@ -141,38 +190,10 @@ def test_registration_resets_password_visibility(auth_env, app):
 
     window._reg_confirm.setText("secret123")
     window._do_register()
+    assert wait_for(lambda: window.current_page() == 0)
 
     assert not window._reg_pass.is_password_visible()
     assert not window._reg_confirm.is_password_visible()
-
-
-def test_remember_me_saves_username_after_successful_login(auth_env, app):
-    auth, prefs = auth_env
-    assert auth.register("chris", "chris@example.com", "secret123")[0]
-
-    signed_in = []
-    window = _window(auth, prefs, signed_in.append)
-    window._login_user.setText("chris")
-    window._login_pass.setText("secret123")
-    window._remember.setChecked(True)
-    window._do_login()
-
-    assert signed_in and signed_in[-1]["username"] == "chris"
-    assert prefs.remember_enabled()
-    assert prefs.remembered_username() == "chris"
-
-
-def test_remember_me_restores_and_unchecking_clears(auth_env, app):
-    auth, prefs = auth_env
-    prefs.set_remembered_username("chris")
-
-    window = _window(auth, prefs)
-    assert window._remember.isChecked()
-    assert window._login_user.text() == "chris"
-
-    window._remember.setChecked(False)
-    assert not prefs.remember_enabled()
-    assert prefs.remembered_username() == ""
 
 
 def test_brand_stage_hides_below_split_width(auth_env, app):
@@ -209,6 +230,16 @@ def test_mode_switch_marks_the_active_segment(auth_env, app):
     assert window._register_tab.property("active") is False
 
 
+def test_in_form_links_switch_modes(auth_env, app):
+    auth, prefs = auth_env
+    window = _window(auth, prefs)
+
+    window._to_register_link.click()
+    assert window.current_page() == 1
+    window._to_login_link.click()
+    assert window.current_page() == 0
+
+
 def test_segment_indicator_follows_the_active_tab(auth_env, app):
     auth, prefs = auth_env
     window = _window(auth, prefs)
@@ -222,44 +253,39 @@ def test_segment_indicator_follows_the_active_tab(auth_env, app):
     assert window._tabs._indicator.geometry() == window._login_tab.geometry()
 
 
-def test_poster_fan_hover_hits_side_cards_and_centre(app):
-    from PySide6.QtCore import QPointF
-    from PySide6.QtGui import QTransform
+def test_stage_copy_follows_the_form_mode(auth_env, app):
+    from ui.components.auth_stage import LEADS
 
-    from ui.components.auth_stage import MediaFan
+    auth, prefs = auth_env
+    window = _window(auth, prefs)
+    assert window._stage.current_lead() == LEADS[0]
 
-    fan = MediaFan()
-    fan.resize(420, 420)
-    fan.show()
-    cards, card_w, card_h = fan._layout()
+    window._go_register()
+    assert window._stage.current_lead() == LEADS[1]
 
-    def world(index, local):
-        origin, angle, *_ = cards[index]
-        transform = QTransform()
-        transform.translate(origin.x(), origin.y())
-        transform.rotate(angle)
-        transform.translate(-card_w / 2, -card_h / 2)
-        return transform.map(QPointF(*local))
-
-    assert fan._card_at(world(0, (8, card_h / 2))) == 0
-    assert fan._card_at(world(1, (card_w - 8, card_h / 2))) == 1
-    assert fan._card_at(world(2, (card_w / 2, card_h / 2))) == 2
-
-    fan._set_hover(0)
-    assert fan._hover == 0
-    assert fan._animations[0].endValue() == 1.0
-    assert fan._animations[2].endValue() == 0.0
+    window._go_login()
+    assert window._stage.current_lead() == LEADS[0]
 
 
-def test_enter_in_register_form_submits(auth_env, app):
+def test_pages_are_pinned_to_the_taller_form(auth_env, app):
+    auth, prefs = auth_env
+    window = _window(auth, prefs)
+    window.resize(1240, 820)
+    window.show()
+
+    assert window._pages.minimumHeight() >= window._form_height(window._register_card)
+    assert window._pages.minimumHeight() >= window._form_height(window._login_card)
+
+
+def test_enter_in_register_form_submits(auth_env, app, wait_for):
     auth, prefs = auth_env
     window = _window(auth, prefs)
     window._go_register()
     _fill_register(window, "enteruser", "enter@example.com", "secret123")
 
     window._reg_confirm.returnPressed.emit()
+    assert wait_for(lambda: window.current_page() == 0)
 
-    assert window.current_page() == 0
     assert not window._login_success.isHidden()
     assert "enteruser" in window._login_success.text
 
@@ -267,7 +293,7 @@ def test_enter_in_register_form_submits(auth_env, app):
 def test_double_submit_is_ignored(auth_env, app):
     auth, prefs = auth_env
     calls = []
-    auth.register = lambda *args, **kwargs: calls.append(args) or (True, "ok")
+    auth.hash_credentials = lambda *args, **kwargs: calls.append(args) or (b"", b"")
 
     window = _window(auth, prefs)
     window._go_register()
@@ -279,7 +305,7 @@ def test_double_submit_is_ignored(auth_env, app):
     assert window.current_page() == 1
 
 
-def test_register_strength_meter_resets_after_success(auth_env, app):
+def test_register_strength_meter_resets_after_success(auth_env, app, wait_for):
     auth, prefs = auth_env
     window = _window(auth, prefs)
     window._go_register()
@@ -287,8 +313,8 @@ def test_register_strength_meter_resets_after_success(auth_env, app):
     assert window._strength.caption in ("Good password", "Strong password")
 
     window._do_register()
+    assert wait_for(lambda: window.current_page() == 0)
 
-    assert window.current_page() == 0
     assert window._strength.caption == "Use at least 6 characters"
 
 

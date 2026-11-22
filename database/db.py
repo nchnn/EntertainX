@@ -24,6 +24,15 @@ def init_db(conn: sqlite3.Connection) -> None:
             secondary_color TEXT    NOT NULL DEFAULT '#FF6584',
             updated_at      TEXT    NOT NULL DEFAULT (datetime('now'))
         );
+        CREATE TABLE IF NOT EXISTS remember_tokens (
+            selector   TEXT    PRIMARY KEY,
+            user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token_hash BLOB    NOT NULL,
+            created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+            expires_at TEXT    NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_remember_tokens_user
+            ON remember_tokens (user_id);
     """)
     columns = {row[1] for row in conn.execute("PRAGMA table_info(users)")}
     if "role" not in columns:

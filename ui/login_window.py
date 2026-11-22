@@ -1,21 +1,29 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QEvent, QPropertyAnimation, Qt
+from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtWidgets import (
-    QCheckBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStackedLayout,
     QVBoxLayout,
     QWidget,
 )
 
 from auth.auth_manager import AuthManager
+from auth.background import run_in_background
 from auth.preferences import LoginPreferences
 from theme import theme_manager as theme
+from ui.components import motion
+from ui.components.auth_controls import (
+    AnimatedCheckBox,
+    LoadingButton,
+    SegmentSwitch,
+    letter_spaced,
+)
 from ui.components.auth_stage import AuthStage
 from ui.components.fields import (
     FormField,
@@ -26,69 +34,30 @@ from ui.components.fields import (
 from ui.components.icons import make_icon
 from ui.components.surfaces import InlineBanner, label
 
-FORM_MAX_WIDTH = 392
+FORM_WIDTH = 408
+MOTION_PAD = 28  # room beside and below the form so sliding content is not clipped
 SPLIT_MIN_WIDTH = 1040
+SUCCESS_HOLD_MS = 420  # let the check mark land before the window fades out
+EXIT_FADE_MS = 260
+REMEMBER_HINT = "Stays signed in for 30 days"
+REMEMBER_TIP = (
+    "Stay signed in on this device for 30 days. Signing out ends it, "
+    "and your password is never stored."
+)
 
-
-class _SegmentSwitch(QFrame):
-    """Two-state switch whose indicator slides to the active segment."""
-
-    def __init__(self, parent: QWidget | None = None) -> None:
-        super().__init__(parent)
-        self.setProperty("role", "segmented")
-        self._buttons: list[QPushButton] = []
-        self._index = 0
-
-        self._indicator = QFrame(self)
-        self._indicator.setProperty("role", "segmentIndicator")
-        self._indicator.setAttribute(
-            Qt.WidgetAttribute.WA_TransparentForMouseEvents, True
-        )
-
-        self._row = QHBoxLayout(self)
-        inset = theme.SPACE_XS - 1
-        self._row.setContentsMargins(inset, inset, inset, inset)
-        self._row.setSpacing(theme.SPACE_XS - 2)
-
-        self._slide = QPropertyAnimation(self._indicator, b"geometry", self)
-        self._slide.setDuration(170)
-        self._slide.setEasingCurve(QEasingCurve.Type.OutCubic)
-
-    def add_segment(self, text: str, handler) -> QPushButton:
-        button = QPushButton(text)
-        button.setProperty("variant", "segment")
-        button.setProperty("active", False)
-        button.setMinimumHeight(32)
-        button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.clicked.connect(handler)
-        self._buttons.append(button)
-        self._row.addWidget(button, 1)
-        return button
-
-    def set_active(self, index: int, animate: bool = False) -> None:
-        self._index = index
-        for position, button in enumerate(self._buttons):
-            button.setProperty("active", position == index)
-            theme.restyle(button)
-
-        target = self._segment_rect(index)
-        self._slide.stop()
-        if animate and self.isVisible() and target.isValid():
-            self._slide.setStartValue(self._indicator.geometry())
-            self._slide.setEndValue(target)
-            self._slide.start()
-        else:
-            self._indicator.setGeometry(target)
-
-    def _segment_rect(self, index: int):
-        if not 0 <= index < len(self._buttons):
-            return self._indicator.geometry()
-        return self._buttons[index].geometry()
-
-    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
-        super().resizeEvent(event)
-        self._slide.stop()
-        self._indicator.setGeometry(self._segment_rect(self._index))
+# (eyebrow, title, supporting line) for each mode.
+COPY = {
+    "login": (
+        "SIGN IN TO ENTERTAINX",
+        "Welcome back.",
+        "Your lists, ratings, and playlists are right where you left them.",
+    ),
+    "register": (
+        "JOIN ENTERTAINX",
+        "Start your collection.",
+        "One free account for every film, album, and game you keep.",
+    ),
+}
 
 
 class LoginWindow(QWidget):
@@ -96,6 +65,9 @@ class LoginWindow(QWidget):
 
     Wide windows show the brand stage beside the form; narrow windows drop the
     stage and centre the same form so the window minimum size stays usable.
+
+    ``notice`` is an optional line shown above the sign-in form, used when a
+    remembered session could not be resumed.
     """
 
     def __init__(
@@ -103,6 +75,7 @@ class LoginWindow(QWidget):
         auth_manager: AuthManager,
         on_login_success,
         preferences: LoginPreferences | None = None,
+        notice: str = "",
     ) -> None:
         super().__init__()
         self._auth = auth_manager
@@ -110,11 +83,21 @@ class LoginWindow(QWidget):
         self._prefs = preferences if preferences is not None else LoginPreferences()
         self._busy = False
         self._split: bool | None = None
+        self._page = 0
+        self._pending: tuple | None = None
+        self._intro_played = False
+        self._exit_user: dict | None = None
         self._blur_checks: dict[QWidget, object] = {}
+
+        self._exit_timer = QTimer(self)
+        self._exit_timer.setSingleShot(True)
+        self._exit_timer.timeout.connect(self._fade_out)
 
         self.setObjectName("AuthBackdrop")
         self._build()
         self._restore_remembered()
+        if notice:
+            self._login_info.show_message(notice)
         self._apply_layout_mode(self.width())
 
     # ── Layout ──────────────────────────────────────────────────────────────
@@ -150,37 +133,49 @@ class LoginWindow(QWidget):
         host.setAutoFillBackground(False)
         column = QVBoxLayout(host)
         column.setContentsMargins(
-            theme.SPACE_XXL, theme.SPACE_XL, theme.SPACE_XXL, theme.SPACE_XL
+            theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_XL, theme.SPACE_LG
         )
         column.setSpacing(0)
         self._host_layout = column
 
+        # A widget's painting is clipped to its parent, so the column is wider
+        # than the form by MOTION_PAD each side (and below) to give the
+        # slide-fade somewhere to travel.
         self._form_column = QWidget()
-        self._form_column.setFixedWidth(FORM_MAX_WIDTH)
+        self._form_column.setFixedWidth(FORM_WIDTH + 2 * MOTION_PAD)
         self._form_column.setSizePolicy(
             QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Maximum
         )
         stack = QVBoxLayout(self._form_column)
-        stack.setContentsMargins(0, 0, 0, 0)
+        stack.setContentsMargins(MOTION_PAD, 0, MOTION_PAD, MOTION_PAD)
         stack.setSpacing(0)
 
         self._tabs = self._build_tabs()
         self._login_card = self._build_login_card()
         self._register_card = self._build_register_card()
-        self._register_card.setVisible(False)
+
+        # A stacked layout is as tall as its tallest page, so the mode switch
+        # above never jumps when the pages differ in height.
+        self._pages = QWidget()
+        self._pages_layout = QStackedLayout(self._pages)
+        self._pages_layout.setContentsMargins(0, 0, 0, 0)
+        self._pages_layout.addWidget(self._login_card)
+        self._pages_layout.addWidget(self._register_card)
+        self._pages_layout.setCurrentIndex(0)
 
         stack.addWidget(self._tabs)
-        stack.addSpacing(theme.SPACE_XL + 6)
-        stack.addWidget(self._login_card)
-        stack.addWidget(self._register_card)
+        stack.addSpacing(theme.SPACE_XL + 4)
+        stack.addWidget(self._pages)
 
+        column.addStretch(1)
         column.addWidget(
             self._form_column,
             0,
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter,
         )
         column.addStretch(1)
-        column.addWidget(self._build_footer())
+        self._footer = self._build_footer()
+        column.addWidget(self._footer)
         self._scroll.setWidget(host)
 
         self._sync_tabs(0)
@@ -215,54 +210,77 @@ class LoginWindow(QWidget):
         return form, body
 
     @staticmethod
-    def _heading(title: str, support: str) -> QWidget:
+    def _heading(eyebrow: str, title: str, support: str) -> QWidget:
         block = QWidget()
         stack = QVBoxLayout(block)
         stack.setContentsMargins(0, 0, 0, 0)
         stack.setSpacing(0)
 
-        rule = QFrame()
-        rule.setProperty("role", "accentRule")
-        rule.setFixedSize(36, 3)
-        stack.addWidget(rule)
-        stack.addSpacing(theme.SPACE_MD)
+        stack.addWidget(letter_spaced(label(eyebrow, "authEyebrow", wrap=False), 2.0))
+        stack.addSpacing(theme.SPACE_SM + 2)
 
         # A fixed-height title can't be squeezed by the scroll host on short
         # windows; word-wrapped labels otherwise lose their descenders.
-        title_label = label(title, "h1", wrap=False)
+        title_label = label(title, "authTitle", wrap=False)
         title_label.setSizePolicy(
             QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed
         )
         stack.addWidget(title_label)
-        stack.addSpacing(theme.SPACE_XS + 2)
-        stack.addWidget(label(support, "muted"))
+        stack.addSpacing(theme.SPACE_SM)
+        stack.addWidget(label(support, "authSupport"))
         return block
 
+    @staticmethod
+    def _row(*widgets: QWidget, stretch_after: int | None = None) -> QWidget:
+        """Group widgets into one horizontal row that behaves as a single item."""
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(theme.SPACE_XS)
+        for index, widget in enumerate(widgets):
+            layout.addWidget(widget, 0, Qt.AlignmentFlag.AlignVCenter)
+            if stretch_after is not None and index == stretch_after:
+                layout.addStretch(1)
+        return row
+
+    def _switch_prompt(self, prompt: str, action: str, handler) -> tuple[QWidget, QPushButton]:
+        """"New here? Create an account" style line under a form."""
+        button = QPushButton(action)
+        button.setProperty("variant", "link")
+        button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.clicked.connect(handler)
+
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(theme.SPACE_XS)
+        layout.addStretch(1)
+        layout.addWidget(label(prompt, "muted", wrap=False), 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(button, 0, Qt.AlignmentFlag.AlignVCenter)
+        layout.addStretch(1)
+        return row, button
+
     # ── Mode switch ─────────────────────────────────────────────────────────
-    def _build_tabs(self) -> _SegmentSwitch:
-        tabs = _SegmentSwitch()
+    def _build_tabs(self) -> SegmentSwitch:
+        tabs = SegmentSwitch()
         self._login_tab = tabs.add_segment("Sign in", self._go_login)
         self._register_tab = tabs.add_segment("Create account", self._go_register)
         return tabs
 
     def _sync_tabs(self, index: int) -> None:
         self._tabs.set_active(index, animate=self._tabs.isVisible())
-        self._scroll.verticalScrollBar().setValue(0)
 
     # ── Login form ──────────────────────────────────────────────────────────
     def _build_login_card(self) -> QWidget:
         form, body = self._form()
 
-        body.addWidget(
-            self._heading(
-                "Welcome back",
-                "Your lists and ratings are right where you left them.",
-            )
-        )
+        body.addWidget(self._heading(*COPY["login"]))
         body.addSpacing(theme.SPACE_SM)
 
+        self._login_info = InlineBanner("info")
         self._login_success = InlineBanner("success")
         self._login_error = InlineBanner("error")
+        body.addWidget(self._login_info)
         body.addWidget(self._login_success)
         body.addWidget(self._login_error)
 
@@ -274,23 +292,29 @@ class LoginWindow(QWidget):
         self._pass_field = FormField("Password", self._login_pass)
         body.addWidget(self._pass_field)
 
-        options = QHBoxLayout()
-        options.setContentsMargins(0, 0, 0, 0)
-        options.setSpacing(theme.SPACE_SM)
-        self._remember = QCheckBox("Remember my username")
-        self._remember.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._remember = AnimatedCheckBox("Remember me")
+        self._remember.setToolTip(REMEMBER_TIP)
         self._remember.toggled.connect(self._on_remember_toggled)
-        options.addWidget(self._remember)
-        options.addStretch(1)
-        body.addLayout(options)
+        self._remember_hint = label("", "caption", wrap=False)
+        self._remember_hint.setToolTip(REMEMBER_TIP)
+        self._options_row = self._row(
+            self._remember, self._remember_hint, stretch_after=0
+        )
+        body.addWidget(self._options_row)
 
         body.addSpacing(theme.SPACE_XS)
-        self._login_button = QPushButton("Sign in")
-        self._login_button.setProperty("variant", "primary")
-        self._login_button.setMinimumHeight(48)
+        self._login_button = LoadingButton("Sign in")
+        self._login_button.setProperty("variant", "hero")
+        self._login_button.setMinimumHeight(50)
         self._login_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._login_button.clicked.connect(self._do_login)
         body.addWidget(self._login_button)
+
+        self._to_register_row, self._to_register_link = self._switch_prompt(
+            "New to EntertainX?", "Create an account", self._go_register
+        )
+        body.addWidget(self._to_register_row)
+        body.addStretch(1)
 
         self._login_user.returnPressed.connect(lambda: self._login_pass.setFocus())
         self._login_pass.returnPressed.connect(self._do_login)
@@ -309,12 +333,7 @@ class LoginWindow(QWidget):
     def _build_register_card(self) -> QWidget:
         form, body = self._form()
 
-        body.addWidget(
-            self._heading(
-                "Create your account",
-                "One account for the movies, music, and games you keep.",
-            )
-        )
+        body.addWidget(self._heading(*COPY["register"]))
         body.addSpacing(theme.SPACE_SM)
 
         self._register_error = InlineBanner("error")
@@ -342,12 +361,18 @@ class LoginWindow(QWidget):
         body.addWidget(self._reg_confirm_field)
 
         body.addSpacing(theme.SPACE_XS)
-        self._register_button = QPushButton("Create account")
-        self._register_button.setProperty("variant", "primary")
-        self._register_button.setMinimumHeight(48)
+        self._register_button = LoadingButton("Create account")
+        self._register_button.setProperty("variant", "hero")
+        self._register_button.setMinimumHeight(50)
         self._register_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self._register_button.clicked.connect(self._do_register)
         body.addWidget(self._register_button)
+
+        self._to_login_row, self._to_login_link = self._switch_prompt(
+            "Already have an account?", "Sign in", self._go_login
+        )
+        body.addWidget(self._to_login_row)
+        body.addStretch(1)
 
         for field in (
             self._reg_user,
@@ -428,29 +453,49 @@ class LoginWindow(QWidget):
         return super().eventFilter(obj, event)
 
     # ── Page switching ──────────────────────────────────────────────────────
-    def _switch(self, index: int) -> None:
-        self._login_card.setVisible(index == 0)
-        self._register_card.setVisible(index == 1)
+    def _switch(self, index: int, then=None) -> None:
+        """Move to a form with a slide-fade; ``then`` runs once it is in place."""
+        direction = 1 if index > self._page else -1
+        changed = index != self._pages_layout.currentIndex()
+        self._page = index
         self._sync_tabs(index)
-        self._update_vertical_rhythm()
+        self._stage.set_mode(index)
+
+        def apply() -> None:
+            self._pages_layout.setCurrentIndex(index)
+            self._scroll.verticalScrollBar().setValue(0)
+            self._pin_height()
+            if then is not None:
+                then()
+
+        if not changed:
+            apply()
+            return
+        motion.swap(
+            self._pages,
+            apply,
+            out_ms=130,
+            in_ms=320,
+            dx_out=-18.0 * direction,
+            dx_in=18.0 * direction,
+        )
 
     def current_page(self) -> int:
-        return 0 if not self._login_card.isHidden() else 1
+        return self._page
 
     def _go_login(self) -> None:
         self._clear_banners()
         self._clear_field_errors()
-        self._switch(0)
-        self._focus_first_empty(0)
+        self._switch(0, then=lambda: self._focus_first_empty(0))
 
     def _go_register(self) -> None:
         self._clear_banners()
         self._clear_field_errors()
-        self._switch(1)
-        self._focus_first_empty(1)
+        self._switch(1, then=lambda: self._focus_first_empty(1))
 
     def _clear_banners(self) -> None:
         for banner in (
+            self._login_info,
             self._login_success,
             self._login_error,
             self._register_error,
@@ -475,6 +520,12 @@ class LoginWindow(QWidget):
             target = self._reg_user
         target.setFocus()
 
+    def _flash(self, banner: InlineBanner, text: str) -> None:
+        """Show feedback with a soft entrance rather than popping in."""
+        banner.show_message(text)
+        motion.reveal(banner, duration=280, rise=6.0)
+        self._pin_height()
+
     # ── Responsive composition ──────────────────────────────────────────────
     def _apply_layout_mode(self, width: int) -> None:
         split = width >= SPLIT_MIN_WIDTH
@@ -484,62 +535,65 @@ class LoginWindow(QWidget):
         self._stage.setVisible(split)
         self._pane.setProperty("split", split)
         theme.restyle(self._pane)
-        self._update_vertical_rhythm()
+        side = theme.SPACE_XXL if split else theme.SPACE_XL
+        self._host_layout.setContentsMargins(
+            side, theme.SPACE_XL, side, theme.SPACE_LG
+        )
+        self._pin_height()
 
-    def _update_vertical_rhythm(self) -> None:
-        """Keep the mode switch at one height in both forms.
+    def _pin_height(self) -> None:
+        """Pin the page stack to the height its tallest form needs.
 
-        The login form is shorter than the register form, so centring each one
-        separately would make the tab strip jump on every switch. The offset is
-        derived from the taller form instead, clamped to 24-96px. The form
-        column is also pinned to the visible form's measured height so the
-        scroll host cannot squeeze wrapped headings on short windows.
+        The host layout sizes a Maximum-policy column to its minimum hint, which
+        squeezes wrapped headings by a few pixels. Measuring each form at the
+        fixed column width keeps every label at its full height.
         """
-        chrome = self._tabs.sizeHint().height() + theme.SPACE_XL + 6
-        tallest = chrome + max(
+        tallest = max(
             self._form_height(self._login_card),
             self._form_height(self._register_card),
         )
-        available = max(self.height(), 1)
-        offset = max(
-            theme.SPACE_XL,
-            min(theme.SPACE_XXL * 3, (available - tallest) // 2),
-        )
-        side = theme.SPACE_XXL if self._split else theme.SPACE_XL
-        self._host_layout.setContentsMargins(
-            side, offset, side, theme.SPACE_XL
-        )
-
-        # The host layout sizes a Maximum-policy column to its minimum hint,
-        # which squeezes wrapped headings by a few pixels. Pin the column to
-        # what the visible form actually needs so no label is compressed.
-        visible = self._register_card if self.current_page() else self._login_card
-        self._form_column.setMinimumHeight(chrome + self._form_height(visible))
+        self._pages.setMinimumHeight(tallest)
 
     @staticmethod
     def _form_height(form: QWidget) -> int:
         """Height a form needs at its fixed width, wrapped headings included."""
         hint = form.sizeHint().height()
         if form.hasHeightForWidth():
-            hint = max(hint, form.heightForWidth(FORM_MAX_WIDTH))
+            hint = max(hint, form.heightForWidth(FORM_WIDTH))
         return hint
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         super().resizeEvent(event)
         self._apply_layout_mode(self.width())
-        self._update_vertical_rhythm()
+        self._pin_height()
 
     def showEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         super().showEvent(event)
         # Fonts and stylesheets are polished on first show; recompute once the
         # forms report their final size hints.
-        self._update_vertical_rhythm()
+        self._pin_height()
+        if not self._intro_played:
+            self._intro_played = True
+            self._play_intro()
+
+    def _play_intro(self) -> None:
+        """Bring the form in item by item once, the first time it is shown."""
+        page = self._pages_layout.currentWidget()
+        targets = [self._tabs]
+        layout = page.layout()
+        for index in range(layout.count()):
+            widget = layout.itemAt(index).widget()
+            if widget is not None and not widget.isHidden():
+                targets.append(widget)
+        targets.append(self._footer)
+        motion.cascade(targets, start=140, step=55, duration=520, rise=16)
 
     # ── Remember Me ─────────────────────────────────────────────────────────
     def _restore_remembered(self) -> None:
         username = self._prefs.remembered_username()
         enabled = self._prefs.remember_enabled() and bool(username)
         self._remember.setChecked(enabled)
+        self._remember_hint.setText(REMEMBER_HINT if enabled else "")
         if username:
             self._login_user.setText(username)
             self._login_pass.setFocus()
@@ -547,7 +601,36 @@ class LoginWindow(QWidget):
             self._login_user.setFocus()
 
     def _on_remember_toggled(self, checked: bool) -> None:
+        text = REMEMBER_HINT if checked else ""
+        if self._remember_hint.text() != text:
+            motion.swap(
+                self._remember_hint,
+                lambda: self._remember_hint.setText(text),
+                out_ms=90,
+                in_ms=200,
+                rise_in=4.0,
+            )
         if not checked:
+            self._forget_remembered()
+
+    def _forget_remembered(self) -> None:
+        """Unticking Remember me ends the saved session as well as the username."""
+        token = self._prefs.remember_token()
+        if token:
+            self._auth.revoke_remember_token(token)
+        self._prefs.clear()
+
+    def _store_remember_choice(self, user: dict) -> None:
+        """Apply the checkbox after a successful sign-in."""
+        stale = self._prefs.remember_token()
+        if stale:
+            self._auth.revoke_remember_token(stale)
+
+        if self._remember.isChecked():
+            token = self._auth.issue_remember_token(user["id"])
+            self._prefs.set_remembered_username(user["username"])
+            self._prefs.set_remember_token(token)
+        else:
             self._prefs.clear()
 
     # ── Login ───────────────────────────────────────────────────────────────
@@ -562,29 +645,69 @@ class LoginWindow(QWidget):
         if not username:
             self._user_field.set_error("Username is required")
             self._login_user.setFocus()
+            motion.shake(self._login_card)
             return
 
-        self._set_busy(True, self._login_button, "Signing in...")
-        try:
-            ok, result = self._auth.login(username, password)
-        finally:
+        # The account lookup is a quick read on this thread; the deliberately
+        # slow password hash runs on a worker so the button keeps animating.
+        record = self._auth.begin_login(username)
+        self._pending = (record, bool(password))
+        self._set_busy(True, self._login_button, "Signing in\u2026")
+        run_in_background(
+            lambda: self._auth.verify_login(record, password),
+            self._on_login_checked,
+            self._on_task_failed,
+        )
+
+    def _on_login_checked(self, ok: bool) -> None:
+        record, had_password = self._pending or (None, False)
+        self._pending = None
+
+        if not ok or record is None:
             self._set_busy(False, self._login_button, "Sign in")
-
-        if ok:
-            if self._remember.isChecked():
-                self._prefs.set_remembered_username(username)
-            else:
-                self._prefs.clear()
-            self._on_success(result)
+            self._reject_login(had_password)
             return
 
-        self._login_error.show_message(str(result))
-        if not password:
+        user = self._auth.complete_login(record)
+        self._store_remember_choice(user)
+        self._begin_exit(user)
+
+    def _reject_login(self, had_password: bool) -> None:
+        self._flash(self._login_error, "Invalid username or password")
+        if not had_password:
             self._pass_field.set_error("Password is required")
         else:
             self._pass_field.set_error("Check your password and try again")
         self._login_pass.selectAll()
         self._login_pass.setFocus()
+        motion.shake(self._login_card)
+
+    def _begin_exit(self, user: dict) -> None:
+        """Confirm the sign-in, then fade out and hand over to the app."""
+        self._login_button.set_state(LoadingButton.SUCCESS, "Welcome back")
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        self._exit_user = user
+        if not motion.motion_enabled():
+            self._on_success(user)
+            return
+        self._exit_timer.start(SUCCESS_HOLD_MS)
+
+    def _fade_out(self) -> None:
+        user = self._exit_user
+        motion.conceal(
+            self,
+            duration=EXIT_FADE_MS,
+            drop=0.0,
+            on_finished=lambda: self._on_success(user),
+        )
+
+    def _on_task_failed(self, _message: str) -> None:
+        """A worker raised unexpectedly; never leave the form stuck busy."""
+        self._pending = None
+        self._set_busy(False, self._login_button, "Sign in")
+        self._set_busy(False, self._register_button, "Create account")
+        error = self._register_error if self._page else self._login_error
+        self._flash(error, "Something went wrong. Please try again.")
 
     # ── Register ────────────────────────────────────────────────────────────
     def _do_register(self) -> None:
@@ -612,13 +735,24 @@ class LoginWindow(QWidget):
 
         if errors or self._reg_confirm_field.has_error:
             self._focus_first_invalid()
+            motion.shake(self._register_card)
             return
 
-        self._set_busy(True, self._register_button, "Creating account...")
-        try:
-            ok, message = self._auth.register(username, email, password)
-        finally:
-            self._set_busy(False, self._register_button, "Create account")
+        self._pending = (username, email)
+        self._set_busy(True, self._register_button, "Creating account\u2026")
+        run_in_background(
+            lambda: self._auth.hash_credentials(password),
+            self._on_hashed,
+            self._on_task_failed,
+        )
+
+    def _on_hashed(self, credentials) -> None:
+        username, email = self._pending or ("", "")
+        self._pending = None
+        pw_hash, salt = credentials
+
+        ok, message = self._auth.store_registration(username, email, pw_hash, salt)
+        self._set_busy(False, self._register_button, "Create account")
 
         if not ok:
             lowered = message.lower()
@@ -627,7 +761,8 @@ class LoginWindow(QWidget):
             elif "email" in lowered:
                 self._reg_email_field.set_error(message)
             else:
-                self._register_error.show_message(message)
+                self._flash(self._register_error, message)
+            motion.shake(self._register_card)
             return
 
         self._on_registered(username)
@@ -640,14 +775,13 @@ class LoginWindow(QWidget):
         self._reg_pass.set_password_visible(False)
         self._reg_confirm.set_password_visible(False)
 
-        self._switch(0)
         self._login_user.setText(username)
         self._login_error.clear()
         self._login_success.show_message(
             f"Welcome, {username}. Your account is ready - sign in below."
         )
         self._pass_field.clear_error()
-        self._login_pass.setFocus()
+        self._switch(0, then=self._login_pass.setFocus)
 
     def _focus_first_invalid(self) -> None:
         for field in (
@@ -661,10 +795,11 @@ class LoginWindow(QWidget):
                 return
 
     # ── Helpers ─────────────────────────────────────────────────────────────
-    def _set_busy(self, busy: bool, button: QPushButton, text: str) -> None:
+    def _set_busy(self, busy: bool, button: LoadingButton, text: str) -> None:
         self._busy = busy
-        button.setEnabled(not busy)
-        button.setText(text)
+        button.set_state(
+            LoadingButton.LOADING if busy else LoadingButton.IDLE, text
+        )
         self.setCursor(
             Qt.CursorShape.BusyCursor if busy else Qt.CursorShape.ArrowCursor
         )
