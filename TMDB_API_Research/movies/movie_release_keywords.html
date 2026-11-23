@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Release Dates & Certifications - TMDB API Research</title>
+  <link rel="stylesheet" href="../assets/css/explorer.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API</span>
+        <span class="nav-title">Movies / Movie Release Dates & Certifications</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="../index.html" class="btn-secondary">Overview Index</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">
+        <span class="endpoint-method">GET</span>
+        <span>Movie Release Dates & Certifications</span>
+      </h1>
+      <div class="endpoint-url">https://api.themoviedb.org/3/movie/{movie_id}/release_dates</div>
+      <p class="page-desc">Global theatrical and digital release schedule with age classifications.</p>
+    </header>
+
+    <div class="control-card">
+      
+      <div class="control-row">
+        <div class="input-group">
+          <label class="input-label" for="movie-id">Movie ID</label>
+          <input type="number" id="movie-id" class="input-field" value="550" />
+        </div>
+        <button id="btn-fetch" class="btn-primary">Query Metadata</button>
+      </div>
+      <div class="quick-samples">
+        <span>Quick Samples:</span>
+        <span class="sample-chip" data-id="550">Fight Club (550)</span>
+        <span class="sample-chip" data-id="27205">Inception (27205)</span>
+        <span class="sample-chip" data-id="299534">Avengers: Endgame (299534)</span>
+      </div>
+
+    </div>
+
+    <div class="view-tabs">
+      <div class="tab-group">
+        <button class="view-tab active" data-tab="visual">Visual View</button>
+        <button class="view-tab" data-tab="json">Raw JSON</button>
+        <button class="view-tab" data-tab="schema">Response Schema</button>
+      </div>
+      <div class="view-actions">
+        <button id="btn-copy-json" class="btn-secondary">Copy JSON</button>
+        <button id="btn-expand-json" class="btn-secondary">Expand All</button>
+        <button id="btn-collapse-json" class="btn-secondary">Collapse All</button>
+      </div>
+    </div>
+
+    <div id="pane-visual" class="view-pane active"></div>
+    <div id="pane-json" class="view-pane"></div>
+    <div id="pane-schema" class="view-pane"></div>
+  </div>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/explorer-core.js"></script>
+  <script>
+
+    const explorer = new TMDBExplorer({
+      endpoint: '/movie/550/release_dates',
+      mockKey: 'movie_release_dates',
+      onRenderVisual: (data, container) => {
+        const results = data.results || [];
+        const typeMap = {
+          1: 'Premiere',
+          2: 'Theatrical (limited)',
+          3: 'Theatrical',
+          4: 'Digital',
+          5: 'Physical',
+          6: 'TV'
+        };
+
+        let rows = [];
+        results.slice(0, 15).forEach(r => {
+          (r.release_dates || []).forEach(rd => {
+            rows.push(`
+              <tr>
+                <td><strong>${r.iso_3166_1}</strong></td>
+                <td><span class="genre-tag">${rd.certification || 'Unrated'}</span></td>
+                <td>${typeMap[rd.type] || ('Type ' + rd.type)}</td>
+                <td>${(rd.release_date || '').slice(0, 10)}</td>
+                <td style="color: var(--text-dim);">${rd.note || '-'}</td>
+              </tr>
+            `);
+          });
+        });
+
+        container.innerHTML = `
+          <div class="section-title">
+            <span>Global Release Dates & Regional Age Certifications</span>
+          </div>
+          <div class="schema-table-container">
+            <table class="schema-table">
+              <thead>
+                <tr>
+                  <th>Country</th>
+                  <th>Certification</th>
+                  <th>Release Type</th>
+                  <th>Date</th>
+                  <th>Note / Festival</th>
+                </tr>
+              </thead>
+              <tbody>${rows.join('')}</tbody>
+            </table>
+          </div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-fetch').addEventListener('click', () => {
+      const id = document.getElementById('movie-id').value.trim() || '550';
+      explorer.execute(`/movie/${id}/release_dates`);
+    });
+
+    document.querySelectorAll('.sample-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.getElementById('movie-id').value = chip.dataset.id;
+        document.getElementById('btn-fetch').click();
+      });
+    });
+
+    explorer.execute();
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TV Seasons & Episodes - TMDB API Research</title>
+  <link rel="stylesheet" href="../assets/css/explorer.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API</span>
+        <span class="nav-title">TV Shows / TV Seasons & Episodes</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="../index.html" class="btn-secondary">Overview Index</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">
+        <span class="endpoint-method">GET</span>
+        <span>TV Seasons & Episodes</span>
+      </h1>
+      <div class="endpoint-url">https://api.themoviedb.org/3/tv/{series_id}/season/{season_number}</div>
+      <p class="page-desc">Detailed breakdown of season episodes, runtimes, stills, and guest stars.</p>
+    </header>
+
+    <div class="control-card">
+      
+      <div class="control-row">
+        <div class="input-group">
+          <label class="input-label" for="tv-id">TV Show ID</label>
+          <input type="number" id="tv-id" class="input-field" value="1399" />
+        </div>
+        <div class="input-group" style="max-width: 140px;">
+          <label class="input-label" for="season-num">Season #</label>
+          <input type="number" id="season-num" class="input-field" value="1" min="0" />
+        </div>
+        <button id="btn-fetch" class="btn-primary">Query Season</button>
+      </div>
+      <div class="quick-samples">
+        <span>Quick Samples:</span>
+        <span class="sample-chip" data-id="1399" data-s="1">GoT Season 1</span>
+        <span class="sample-chip" data-id="1399" data-s="8">GoT Season 8</span>
+        <span class="sample-chip" data-id="1396" data-s="5">Breaking Bad Season 5</span>
+        <span class="sample-chip" data-id="94605" data-s="1">Arcane Season 1</span>
+      </div>
+
+    </div>
+
+    <div class="view-tabs">
+      <div class="tab-group">
+        <button class="view-tab active" data-tab="visual">Visual View</button>
+        <button class="view-tab" data-tab="json">Raw JSON</button>
+        <button class="view-tab" data-tab="schema">Response Schema</button>
+      </div>
+      <div class="view-actions">
+        <button id="btn-copy-json" class="btn-secondary">Copy JSON</button>
+        <button id="btn-expand-json" class="btn-secondary">Expand All</button>
+        <button id="btn-collapse-json" class="btn-secondary">Collapse All</button>
+      </div>
+    </div>
+
+    <div id="pane-visual" class="view-pane active"></div>
+    <div id="pane-json" class="view-pane"></div>
+    <div id="pane-schema" class="view-pane"></div>
+  </div>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/explorer-core.js"></script>
+  <script>
+
+    const explorer = new TMDBExplorer({
+      endpoint: '/tv/1399/season/1',
+      mockKey: 'tv_season',
+      onRenderVisual: (data, container) => {
+        const episodes = data.episodes || [];
+        const seasonTitle = data.name || `Season ${data.season_number}`;
+
+        let epCards = episodes.map(ep => {
+          const still = ep.still_path ? `${TMDB_IMAGE_BASE}w300${ep.still_path}` : 'https://placehold.co/300x169/1a1f2e/9ba6be?text=No+Still';
+          return `
+            <div class="media-card" style="display: flex; flex-direction: row; align-items: stretch;">
+              <img src="${still}" style="width: 220px; aspect-ratio: 16/9; object-fit: cover; flex-shrink: 0;" alt="Still" />
+              <div class="card-body">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <div class="card-title">Ep ${ep.episode_number}: ${ep.name}</div>
+                  <span class="card-rating">★ ${ep.vote_average ? ep.vote_average.toFixed(1) : 'NR'}</span>
+                </div>
+                <div class="card-sub">
+                  <span>Air Date: ${ep.air_date || 'TBA'}</span>
+                  <span>Runtime: ${ep.runtime ? ep.runtime + 'm' : 'N/A'}</span>
+                </div>
+                <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">${ep.overview || 'No episode description.'}</p>
+                <div style="font-size: 11px; color: var(--text-dim); margin-top: 6px;">
+                  Guest Stars: ${(ep.guest_stars || []).slice(0, 4).map(g => g.name).join(', ') || 'None listed'}
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="section-title">
+            <span>${seasonTitle} - Episodes (${episodes.length} episodes)</span>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 14px;">${epCards}</div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-fetch').addEventListener('click', () => {
+      const id = document.getElementById('tv-id').value.trim() || '1399';
+      const s = document.getElementById('season-num').value.trim() || '1';
+      explorer.execute(`/tv/${id}/season/${s}`);
+    });
+
+    document.querySelectorAll('.sample-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.getElementById('tv-id').value = chip.dataset.id;
+        document.getElementById('season-num').value = chip.dataset.s;
+        document.getElementById('btn-fetch').click();
+      });
+    });
+
+    explorer.execute();
+
+  </script>
+</body>
+</html>

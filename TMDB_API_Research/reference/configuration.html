@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Configuration - TMDB API Research</title>
+  <link rel="stylesheet" href="../assets/css/explorer.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API</span>
+        <span class="nav-title">Reference / API Configuration</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="../index.html" class="btn-secondary">Overview Index</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">
+        <span class="endpoint-method">GET</span>
+        <span>API Configuration</span>
+      </h1>
+      <div class="endpoint-url">https://api.themoviedb.org/3/configuration</div>
+      <p class="page-desc">Official CDN paths, supported poster/backdrop/logo/still dimension specifications, and system change keys.</p>
+    </header>
+
+    <div class="control-card">
+      
+      <div class="control-row">
+        <button id="btn-fetch" class="btn-primary">Query API Configuration</button>
+      </div>
+
+    </div>
+
+    <div class="view-tabs">
+      <div class="tab-group">
+        <button class="view-tab active" data-tab="visual">Visual View</button>
+        <button class="view-tab" data-tab="json">Raw JSON</button>
+        <button class="view-tab" data-tab="schema">Response Schema</button>
+      </div>
+      <div class="view-actions">
+        <button id="btn-copy-json" class="btn-secondary">Copy JSON</button>
+        <button id="btn-expand-json" class="btn-secondary">Expand All</button>
+        <button id="btn-collapse-json" class="btn-secondary">Collapse All</button>
+      </div>
+    </div>
+
+    <div id="pane-visual" class="view-pane active"></div>
+    <div id="pane-json" class="view-pane"></div>
+    <div id="pane-schema" class="view-pane"></div>
+  </div>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/explorer-core.js"></script>
+  <script>
+
+    const explorer = new TMDBExplorer({
+      endpoint: '/configuration',
+      mockKey: 'configuration',
+      onRenderVisual: (data, container) => {
+        const images = data.images || {};
+        const posterSizes = (images.poster_sizes || []).map(s => `<span class="genre-tag">${s}</span>`).join(' ');
+        const backdropSizes = (images.backdrop_sizes || []).map(s => `<span class="genre-tag">${s}</span>`).join(' ');
+        const profileSizes = (images.profile_sizes || []).map(s => `<span class="genre-tag">${s}</span>`).join(' ');
+        const logoSizes = (images.logo_sizes || []).map(s => `<span class="genre-tag">${s}</span>`).join(' ');
+        const stillSizes = (images.still_sizes || []).map(s => `<span class="genre-tag">${s}</span>`).join(' ');
+
+        container.innerHTML = `
+          <div class="hero-banner" style="background-color: var(--bg-secondary);">
+            <div class="hero-content" style="flex-direction: column;">
+              <h2 class="hero-title">TMDB CDN & CDN Topology</h2>
+              <div class="meta-grid">
+                <div class="meta-item">
+                  <div class="meta-label">Secure Base URL</div>
+                  <div class="meta-value">${images.secure_base_url || 'https://image.tmdb.org/t/p/'}</div>
+                </div>
+                <div class="meta-item">
+                  <div class="meta-label">Insecure Base URL</div>
+                  <div class="meta-value">${images.base_url || 'http://image.tmdb.org/t/p/'}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title">
+            <span>Standard Media Dimension Tiers</span>
+          </div>
+          <div class="schema-table-container">
+            <table class="schema-table">
+              <thead>
+                <tr>
+                  <th style="width: 220px;">Asset Type</th>
+                  <th>Supported CDN Resolution Widths</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><strong>Posters</strong></td>
+                  <td>${posterSizes}</td>
+                </tr>
+                <tr>
+                  <td><strong>Backdrops</strong></td>
+                  <td>${backdropSizes}</td>
+                </tr>
+                <tr>
+                  <td><strong>Profiles (Actors/Crew)</strong></td>
+                  <td>${profileSizes}</td>
+                </tr>
+                <tr>
+                  <td><strong>Logos</strong></td>
+                  <td>${logoSizes}</td>
+                </tr>
+                <tr>
+                  <td><strong>Episode Stills</strong></td>
+                  <td>${stillSizes}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-fetch').addEventListener('click', () => {
+      explorer.execute('/configuration');
+    });
+
+    explorer.execute();
+
+  </script>
+</body>
+</html>

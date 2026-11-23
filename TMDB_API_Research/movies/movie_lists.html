@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Lists - TMDB API Research</title>
+  <link rel="stylesheet" href="../assets/css/explorer.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API</span>
+        <span class="nav-title">Movies / Movie Lists</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="../index.html" class="btn-secondary">Overview Index</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">
+        <span class="endpoint-method">GET</span>
+        <span>Movie Lists</span>
+      </h1>
+      <div class="endpoint-url">https://api.themoviedb.org/3/movie/{list_type}</div>
+      <p class="page-desc">Standard curated collections: popular, now playing, top rated, and upcoming.</p>
+    </header>
+
+    <div class="control-card">
+      
+      <div class="control-row">
+        <div class="input-group">
+          <label class="input-label" for="list-type">Movie List Type</label>
+          <select id="list-type" class="select-field">
+            <option value="popular">Popular (/movie/popular)</option>
+            <option value="now_playing">Now Playing (/movie/now_playing)</option>
+            <option value="top_rated">Top Rated (/movie/top_rated)</option>
+            <option value="upcoming">Upcoming (/movie/upcoming)</option>
+          </select>
+        </div>
+        <div class="input-group" style="max-width: 120px;">
+          <label class="input-label" for="list-page">Page</label>
+          <input type="number" id="list-page" class="input-field" value="1" min="1" max="500" />
+        </div>
+        <div class="input-group" style="max-width: 140px;">
+          <label class="input-label" for="list-region">Region</label>
+          <input type="text" id="list-region" class="input-field" value="US" placeholder="e.g. US" />
+        </div>
+        <button id="btn-fetch" class="btn-primary">Query List</button>
+      </div>
+
+    </div>
+
+    <div class="view-tabs">
+      <div class="tab-group">
+        <button class="view-tab active" data-tab="visual">Visual View</button>
+        <button class="view-tab" data-tab="json">Raw JSON</button>
+        <button class="view-tab" data-tab="schema">Response Schema</button>
+      </div>
+      <div class="view-actions">
+        <button id="btn-copy-json" class="btn-secondary">Copy JSON</button>
+        <button id="btn-expand-json" class="btn-secondary">Expand All</button>
+        <button id="btn-collapse-json" class="btn-secondary">Collapse All</button>
+      </div>
+    </div>
+
+    <div id="pane-visual" class="view-pane active"></div>
+    <div id="pane-json" class="view-pane"></div>
+    <div id="pane-schema" class="view-pane"></div>
+  </div>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/explorer-core.js"></script>
+  <script>
+
+    const explorer = new TMDBExplorer({
+      endpoint: '/movie/popular',
+      mockKey: 'movie_popular',
+      defaultParams: { page: 1 },
+      onRenderVisual: (data, container) => {
+        const results = data.results || [];
+        const page = data.page || 1;
+        const totalPages = data.total_pages || 1;
+        const totalResults = data.total_results || 0;
+
+        let cards = results.map(m => {
+          const poster = m.poster_path ? `${TMDB_IMAGE_BASE}w342${m.poster_path}` : 'https://placehold.co/342x513/1a1f2e/9ba6be?text=No+Poster';
+          const year = (m.release_date || '').slice(0, 4) || 'TBA';
+          return `
+            <div class="media-card">
+              <img src="${poster}" class="card-thumb" alt="${m.title}" />
+              <div class="card-body">
+                <div class="card-title" title="${m.title}">${m.title}</div>
+                <div class="card-sub">
+                  <span>${year}</span>
+                  <span class="card-rating">★ ${m.vote_average ? m.vote_average.toFixed(1) : 'NR'}</span>
+                </div>
+                <div class="card-sub" style="font-size: 11px; color: var(--text-dim);">
+                  <span>Votes: ${m.vote_count}</span>
+                  <span>Pop: ${m.popularity ? m.popularity.toFixed(0) : 0}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="section-title">
+            <span>List Results (Page ${page} of ${totalPages} - ${totalResults.toLocaleString()} items)</span>
+          </div>
+          <div class="card-grid">${cards}</div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-fetch').addEventListener('click', () => {
+      const type = document.getElementById('list-type').value;
+      const page = document.getElementById('list-page').value || '1';
+      const region = document.getElementById('list-region').value.trim();
+      explorer.mockKey = `movie_${type}`;
+      explorer.execute(`/movie/${type}`, { page, region });
+    });
+
+    explorer.execute();
+
+  </script>
+</body>
+</html>

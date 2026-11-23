@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search TV Shows - TMDB API Research</title>
+  <link rel="stylesheet" href="../assets/css/explorer.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API</span>
+        <span class="nav-title">Search / Search TV Shows</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="../index.html" class="btn-secondary">Overview Index</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">
+        <span class="endpoint-method">GET</span>
+        <span>Search TV Shows</span>
+      </h1>
+      <div class="endpoint-url">https://api.themoviedb.org/3/search/tv</div>
+      <p class="page-desc">Targeted television series query with first air date filters.</p>
+    </header>
+
+    <div class="control-card">
+      
+      <div class="control-row">
+        <div class="input-group">
+          <label class="input-label" for="search-query">TV Show Name</label>
+          <input type="text" id="search-query" class="input-field" value="Game of Thrones" placeholder="Search shows..." />
+        </div>
+        <div class="input-group" style="max-width: 130px;">
+          <label class="input-label" for="first-air-year">First Air Year</label>
+          <input type="number" id="first-air-year" class="input-field" placeholder="e.g. 2011" />
+        </div>
+        <button id="btn-fetch" class="btn-primary">Search TV Shows</button>
+      </div>
+      <div class="quick-samples">
+        <span>Quick Samples:</span>
+        <span class="sample-chip" data-q="Game of Thrones">Game of Thrones</span>
+        <span class="sample-chip" data-q="Stranger Things">Stranger Things</span>
+        <span class="sample-chip" data-q="Arcane">Arcane</span>
+      </div>
+
+    </div>
+
+    <div class="view-tabs">
+      <div class="tab-group">
+        <button class="view-tab active" data-tab="visual">Visual View</button>
+        <button class="view-tab" data-tab="json">Raw JSON</button>
+        <button class="view-tab" data-tab="schema">Response Schema</button>
+      </div>
+      <div class="view-actions">
+        <button id="btn-copy-json" class="btn-secondary">Copy JSON</button>
+        <button id="btn-expand-json" class="btn-secondary">Expand All</button>
+        <button id="btn-collapse-json" class="btn-secondary">Collapse All</button>
+      </div>
+    </div>
+
+    <div id="pane-visual" class="view-pane active"></div>
+    <div id="pane-json" class="view-pane"></div>
+    <div id="pane-schema" class="view-pane"></div>
+  </div>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/explorer-core.js"></script>
+  <script>
+
+    const explorer = new TMDBExplorer({
+      endpoint: '/search/tv',
+      mockKey: 'search_tv',
+      defaultParams: { query: 'Game of Thrones' },
+      onRenderVisual: (data, container) => {
+        const results = data.results || [];
+        let cards = results.map(t => {
+          const poster = t.poster_path ? `${TMDB_IMAGE_BASE}w342${t.poster_path}` : 'https://placehold.co/342x513/1a1f2e/9ba6be?text=No+Poster';
+          return `
+            <div class="media-card">
+              <img src="${poster}" class="card-thumb" alt="${t.name}" />
+              <div class="card-body">
+                <div class="card-title" title="${t.name}">${t.name}</div>
+                <div class="card-sub">
+                  <span>${(t.first_air_date || '').slice(0, 4)}</span>
+                  <span class="card-rating">★ ${t.vote_average ? t.vote_average.toFixed(1) : 'NR'}</span>
+                </div>
+                <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                  ${t.overview || 'No synopsis.'}
+                </p>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="section-title">
+            <span>TV Series Matches (${data.total_results || 0} total)</span>
+          </div>
+          <div class="card-grid">${cards}</div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-fetch').addEventListener('click', () => {
+      const q = document.getElementById('search-query').value.trim() || 'Game of Thrones';
+      const year = document.getElementById('first-air-year').value.trim();
+      const params = { query: q };
+      if (year) params.first_air_date_year = year;
+      explorer.execute('/search/tv', params);
+    });
+
+    document.querySelectorAll('.sample-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.getElementById('search-query').value = chip.dataset.q;
+        document.getElementById('btn-fetch').click();
+      });
+    });
+
+    explorer.execute();
+
+  </script>
+</body>
+</html>

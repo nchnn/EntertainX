@@ -16,7 +16,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QWidget
 
 # ── Surfaces ────────────────────────────────────────────────────────────────
-BG = "#242326"
+BG = "#1c1b1c"
 BG_SIDEBAR = "#303034"
 BG_CARD = "#3B393F"
 BG_ELEVATED = "#454249"
@@ -94,6 +94,11 @@ SIDEBAR_WIDTH = 236
 CONTROL_HEIGHT = 44
 CARD_MIN_WIDTH = 210
 CARD_THUMB_HEIGHT = 150
+
+# Browse page tile dimensions (landscape 16:9 tiles in scrolling shelves)
+TILE_WIDTH = 272
+TILE_HEIGHT = 153
+HERO_HEIGHT = 440
 
 # Legacy aliases kept so older imports keep working.
 BG_DARK = BG
@@ -802,6 +807,107 @@ QMenu::item:selected {
     background-color: %(accent_soft_strong)s;
     color: %(text)s;
 }
+
+/* ── Browse: hero, shelves, hover preview, detail panel ───────────────── */
+QLabel[role="heroTitle"] {
+    color: %(text)s;
+    font-family: %(font_display)s;
+    font-size: 44px;
+    font-weight: 400;
+}
+QLabel[role="detailTitle"] {
+    color: %(text)s;
+    font-family: %(font_display)s;
+    font-size: 32px;
+    font-weight: 400;
+}
+QLabel[role="heroMeta"] {
+    color: %(text_secondary)s;
+    font-size: %(size_md)spx;
+    font-weight: 600;
+}
+QLabel[role="heroOverview"] {
+    color: %(text_secondary)s;
+    font-size: %(size_md)spx;
+}
+QLabel[role="heroChip"] {
+    background-color: rgba(0, 0, 0, 0.45);
+    color: %(text)s;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    border-radius: %(radius_pill)spx;
+    padding: 3px 10px;
+    font-size: %(size_xs)spx;
+    font-weight: 700;
+}
+QLabel[role="rating"] {
+    color: %(warning)s;
+    font-size: %(size_base)spx;
+    font-weight: 700;
+}
+QLabel[role="sectionTitle"] {
+    color: %(text)s;
+    font-size: %(size_xl)spx;
+    font-weight: 600;
+}
+QFrame[role="detailPanel"] {
+    background-color: %(bg_card)s;
+    border: 1px solid %(border)s;
+    border-radius: %(radius_xl)spx;
+}
+QFrame[role="detailPanel"] QScrollArea,
+QFrame[role="detailPanel"] QScrollArea > QWidget,
+QFrame[role="detailPanel"] QScrollArea > QWidget > QWidget {
+    background: transparent;
+    border: none;
+}
+QPushButton[variant="glass"] {
+    background-color: rgba(255, 255, 255, 0.16);
+    color: %(text)s;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: %(radius_md)spx;
+    padding: 11px 20px;
+    font-size: %(size_md)spx;
+    font-weight: 600;
+}
+QPushButton[variant="glass"]:hover {
+    background-color: rgba(255, 255, 255, 0.26);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+QPushButton[variant="glass"]:pressed {
+    background-color: rgba(255, 255, 255, 0.10);
+}
+QPushButton[variant="glass"]:focus {
+    border: 1px solid %(text)s;
+}
+QPushButton[variant="ring"] {
+    background-color: rgba(36, 35, 38, 0.72);
+    border: 2px solid rgba(255, 255, 255, 0.45);
+    border-radius: 19px;
+    padding: 0px;
+}
+QPushButton[variant="ring"]:hover {
+    border-color: %(text)s;
+    background-color: rgba(255, 255, 255, 0.16);
+}
+QPushButton[variant="ring"]:pressed {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+QPushButton[variant="ring"]:focus {
+    border-color: %(accent)s;
+}
+QPushButton[variant="rowArrow"] {
+    background-color: rgba(20, 19, 21, 0.78);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 22px;
+    padding: 0px;
+}
+QPushButton[variant="rowArrow"]:hover {
+    background-color: %(accent)s;
+    border-color: %(accent)s;
+}
+QPushButton[variant="rowArrow"]:focus {
+    border-color: %(accent)s;
+}
 """
 
 
@@ -850,6 +956,7 @@ def build_stylesheet(primary: str | None = None, secondary: str | None = None) -
         "size_base": FONT_SIZE_BASE,
         "size_md": FONT_SIZE_MD,
         "size_lg": FONT_SIZE_LG,
+        "size_xl": FONT_SIZE_XL,
         "size_h1": FONT_SIZE_H1,
         "size_h2": FONT_SIZE_H2,
         "size_display": FONT_SIZE_DISPLAY,
@@ -858,6 +965,7 @@ def build_stylesheet(primary: str | None = None, secondary: str | None = None) -
         "radius_sm": RADIUS_SM,
         "radius_md": RADIUS_MD,
         "radius_lg": RADIUS_LG,
+        "radius_xl": RADIUS_XL,
         "radius_pill": RADIUS_PILL,
         "check_icon": _check_icon_path(),
     }

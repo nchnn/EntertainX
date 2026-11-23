@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TV Content Ratings - TMDB API Research</title>
+  <link rel="stylesheet" href="../assets/css/explorer.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API</span>
+        <span class="nav-title">TV Shows / TV Content Ratings</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="../index.html" class="btn-secondary">Overview Index</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">
+        <span class="endpoint-method">GET</span>
+        <span>TV Content Ratings</span>
+      </h1>
+      <div class="endpoint-url">https://api.themoviedb.org/3/tv/{series_id}/content_ratings</div>
+      <p class="page-desc">Parental guidelines and regional television ratings classifications.</p>
+    </header>
+
+    <div class="control-card">
+      
+      <div class="control-row">
+        <div class="input-group">
+          <label class="input-label" for="tv-id">TV Show ID</label>
+          <input type="number" id="tv-id" class="input-field" value="1399" />
+        </div>
+        <button id="btn-fetch" class="btn-primary">Query Ratings</button>
+      </div>
+      <div class="quick-samples">
+        <span>Quick Samples:</span>
+        <span class="sample-chip" data-id="1399">Game of Thrones</span>
+        <span class="sample-chip" data-id="1396">Breaking Bad</span>
+        <span class="sample-chip" data-id="66732">Stranger Things</span>
+      </div>
+
+    </div>
+
+    <div class="view-tabs">
+      <div class="tab-group">
+        <button class="view-tab active" data-tab="visual">Visual View</button>
+        <button class="view-tab" data-tab="json">Raw JSON</button>
+        <button class="view-tab" data-tab="schema">Response Schema</button>
+      </div>
+      <div class="view-actions">
+        <button id="btn-copy-json" class="btn-secondary">Copy JSON</button>
+        <button id="btn-expand-json" class="btn-secondary">Expand All</button>
+        <button id="btn-collapse-json" class="btn-secondary">Collapse All</button>
+      </div>
+    </div>
+
+    <div id="pane-visual" class="view-pane active"></div>
+    <div id="pane-json" class="view-pane"></div>
+    <div id="pane-schema" class="view-pane"></div>
+  </div>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/explorer-core.js"></script>
+  <script>
+
+    const explorer = new TMDBExplorer({
+      endpoint: '/tv/1399/content_ratings',
+      mockKey: 'tv_content_ratings',
+      onRenderVisual: (data, container) => {
+        const results = data.results || [];
+        let rows = results.map(r => `
+          <tr>
+            <td><strong>${r.iso_3166_1}</strong></td>
+            <td><span class="genre-tag" style="background: rgba(239,68,68,0.15); color: #f87171;">${r.rating}</span></td>
+            <td>${r.descriptors ? r.descriptors.join(', ') : 'Standard broadcast classification'}</td>
+          </tr>
+        `).join('');
+
+        container.innerHTML = `
+          <div class="section-title">
+            <span>Global TV Content Ratings (${results.length} jurisdictions)</span>
+          </div>
+          <div class="schema-table-container">
+            <table class="schema-table">
+              <thead>
+                <tr>
+                  <th>Country Code</th>
+                  <th>Content Rating</th>
+                  <th>Descriptors / Guidance</th>
+                </tr>
+              </thead>
+              <tbody>${rows || '<tr><td colspan="3">No ratings recorded.</td></tr>'}</tbody>
+            </table>
+          </div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-fetch').addEventListener('click', () => {
+      const id = document.getElementById('tv-id').value.trim() || '1399';
+      explorer.execute(`/tv/${id}/content_ratings`);
+    });
+
+    document.querySelectorAll('.sample-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.getElementById('tv-id').value = chip.dataset.id;
+        document.getElementById('btn-fetch').click();
+      });
+    });
+
+    explorer.execute();
+
+  </script>
+</body>
+</html>

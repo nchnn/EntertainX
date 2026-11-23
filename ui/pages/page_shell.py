@@ -39,6 +39,7 @@ class PageShell(QWidget):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         outer.addWidget(scroll)
+        self.scroll_area = scroll  # exposed so BrowsePage can connect the scrollbar
 
         canvas = QWidget()
         self.content = QVBoxLayout(canvas)

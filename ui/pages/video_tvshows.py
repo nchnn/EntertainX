@@ -1,26 +1,19 @@
+from __future__ import annotations
+
 from PySide6.QtWidgets import QWidget
 
-from ui.components.media_card import MediaCard
-from ui.pages.page_shell import GridPage
-from ui.pages.sample_data import SHOWS
+from api.images import ImageStore
+from api.movies import TmdbClient
+from ui.pages.video_browse import BrowsePage
 
 
-class TVShowsPage(GridPage):
-    def __init__(self, parent: QWidget | None = None) -> None:
-        cards = [
-            MediaCard(
-                "film",
-                show["title"],
-                show["genre"],
-                show["seasons"],
-                category=show["genre"],
-            )
-            for show in SHOWS
-        ]
-        super().__init__(
-            "TV Shows",
-            "Keep up with the series you follow, season by season.",
-            cards,
-            search_placeholder="Search shows",
-            parent=parent,
-        )
+class TVShowsPage(BrowsePage):
+    """Trending, airing, and genre shelves of TV series (TMDB)."""
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        provider: TmdbClient | None = None,
+        store: ImageStore | None = None,
+    ) -> None:
+        super().__init__("tv", "TV Shows", provider=provider, store=store, parent=parent)

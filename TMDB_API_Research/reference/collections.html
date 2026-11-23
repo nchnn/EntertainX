@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Collections - TMDB API Research</title>
+  <link rel="stylesheet" href="../assets/css/explorer.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API</span>
+        <span class="nav-title">Reference / Movie Collections</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="../index.html" class="btn-secondary">Overview Index</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">
+        <span class="endpoint-method">GET</span>
+        <span>Movie Collections</span>
+      </h1>
+      <div class="endpoint-url">https://api.themoviedb.org/3/collection/{collection_id}</div>
+      <p class="page-desc">Franchises, sequels, and cinematic universe groupings.</p>
+    </header>
+
+    <div class="control-card">
+      
+      <div class="control-row">
+        <div class="input-group">
+          <label class="input-label" for="collection-id">Collection ID</label>
+          <input type="number" id="collection-id" class="input-field" value="86311" />
+        </div>
+        <button id="btn-fetch" class="btn-primary">Query Collection</button>
+      </div>
+      <div class="quick-samples">
+        <span>Quick Samples:</span>
+        <span class="sample-chip" data-id="86311">The Avengers Collection (86311)</span>
+        <span class="sample-chip" data-id="10">Star Wars Collection (10)</span>
+        <span class="sample-chip" data-id="645">James Bond Collection (645)</span>
+        <span class="sample-chip" data-id="295">Pirates of the Caribbean (295)</span>
+      </div>
+
+    </div>
+
+    <div class="view-tabs">
+      <div class="tab-group">
+        <button class="view-tab active" data-tab="visual">Visual View</button>
+        <button class="view-tab" data-tab="json">Raw JSON</button>
+        <button class="view-tab" data-tab="schema">Response Schema</button>
+      </div>
+      <div class="view-actions">
+        <button id="btn-copy-json" class="btn-secondary">Copy JSON</button>
+        <button id="btn-expand-json" class="btn-secondary">Expand All</button>
+        <button id="btn-collapse-json" class="btn-secondary">Collapse All</button>
+      </div>
+    </div>
+
+    <div id="pane-visual" class="view-pane active"></div>
+    <div id="pane-json" class="view-pane"></div>
+    <div id="pane-schema" class="view-pane"></div>
+  </div>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/explorer-core.js"></script>
+  <script>
+
+    const explorer = new TMDBExplorer({
+      endpoint: '/collection/86311',
+      mockKey: 'collection',
+      onRenderVisual: (data, container) => {
+        const posterUrl = data.poster_path ? `${TMDB_IMAGE_BASE}w342${data.poster_path}` : '';
+        const backdropUrl = data.backdrop_path ? `${TMDB_IMAGE_BASE}w1280${data.backdrop_path}` : '';
+        const parts = data.parts || [];
+
+        let partCards = parts.map(m => {
+          const poster = m.poster_path ? `${TMDB_IMAGE_BASE}w342${m.poster_path}` : 'https://placehold.co/342x513/1a1f2e/9ba6be?text=No+Poster';
+          return `
+            <div class="media-card">
+              <img src="${poster}" class="card-thumb" alt="${m.title}" />
+              <div class="card-body">
+                <div class="card-title" title="${m.title}">${m.title}</div>
+                <div class="card-sub">
+                  <span>${(m.release_date || '').slice(0, 4)}</span>
+                  <span class="card-rating">★ ${m.vote_average ? m.vote_average.toFixed(1) : 'NR'}</span>
+                </div>
+                <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                  ${m.overview || 'No synopsis.'}
+                </p>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="hero-banner" style="background-image: url('${backdropUrl}')">
+            <div class="hero-backdrop-overlay"></div>
+            <div class="hero-content">
+              ${posterUrl ? `<img src="${posterUrl}" class="hero-poster" alt="Poster" />` : ''}
+              <div class="hero-details">
+                <h2 class="hero-title">${data.name}</h2>
+                <div class="hero-meta">
+                  <span>Total Movies in Franchise: <strong>${parts.length}</strong></span>
+                </div>
+                <p class="hero-overview">${data.overview || 'No collection overview available.'}</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="section-title">
+            <span>Franchise Installments (${parts.length} movies)</span>
+          </div>
+          <div class="card-grid">${partCards}</div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-fetch').addEventListener('click', () => {
+      const id = document.getElementById('collection-id').value.trim() || '86311';
+      explorer.execute(`/collection/${id}`);
+    });
+
+    document.querySelectorAll('.sample-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.getElementById('collection-id').value = chip.dataset.id;
+        document.getElementById('btn-fetch').click();
+      });
+    });
+
+    explorer.execute();
+
+  </script>
+</body>
+</html>

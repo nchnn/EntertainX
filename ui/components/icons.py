@@ -55,6 +55,8 @@ _SLUGS = {
     "restore": "copy",
     "check": "check",
     "shield": "shield",
+    "volume-2": "volume-2",
+    "volume-x": "volume-x",
 }
 
 
@@ -70,7 +72,7 @@ def _svg_source(slug: str) -> QByteArray:
     return QByteArray(path.read_bytes())
 
 
-def _paint(name: str, color: str, px: int) -> QPixmap:
+def _paint(name: str, color: str, px: int, rotate: int = 0) -> QPixmap:
     renderer = QSvgRenderer(_svg_source(_SLUGS[name]))
     pixmap = QPixmap(px, px)
     pixmap.fill(Qt.GlobalColor.transparent)
@@ -82,6 +84,11 @@ def _paint(name: str, color: str, px: int) -> QPixmap:
     painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
     painter.fillRect(pixmap.rect(), QColor(color))
     painter.end()
+    if rotate % 360:
+        from PySide6.QtGui import QTransform
+        pixmap = pixmap.transformed(
+            QTransform().rotate(rotate), Qt.TransformationMode.SmoothTransformation
+        )
     return pixmap
 
 
@@ -90,6 +97,7 @@ def make_icon(
     color: str,
     size: int = 18,
     active_color: str | None = None,
+    rotate: int = 0,
 ) -> QIcon:
     """Return a crisp ``QIcon`` for ``name`` tinted with ``color``.
 
@@ -100,12 +108,12 @@ def make_icon(
         raise KeyError(f"Unknown icon: {name}")
     px = size * 2
     icon = QIcon()
-    icon.addPixmap(_paint(name, color, px), QIcon.Mode.Normal, QIcon.State.Off)
+    icon.addPixmap(_paint(name, color, px, rotate), QIcon.Mode.Normal, QIcon.State.Off)
     icon.addPixmap(
-        _paint(name, active_color or color, px), QIcon.Mode.Normal, QIcon.State.On
+        _paint(name, active_color or color, px, rotate), QIcon.Mode.Normal, QIcon.State.On
     )
     icon.addPixmap(
-        _paint(name, theme.TEXT_DISABLED, px), QIcon.Mode.Disabled, QIcon.State.Off
+        _paint(name, theme.TEXT_DISABLED, px, rotate), QIcon.Mode.Disabled, QIcon.State.Off
     )
     return icon
 

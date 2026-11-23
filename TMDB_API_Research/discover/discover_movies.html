@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discover Movies - TMDB API Research</title>
+  <link rel="stylesheet" href="../assets/css/explorer.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API</span>
+        <span class="nav-title">Discover / Discover Movies</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="../index.html" class="btn-secondary">Overview Index</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">
+        <span class="endpoint-method">GET</span>
+        <span>Discover Movies</span>
+      </h1>
+      <div class="endpoint-url">https://api.themoviedb.org/3/discover/movie</div>
+      <p class="page-desc">Multi-parameter faceted query engine supporting genre intersections, vote thresholds, and sorting.</p>
+    </header>
+
+    <div class="control-card">
+      
+      <div class="control-row">
+        <div class="input-group">
+          <label class="input-label" for="sort-by">Sort By</label>
+          <select id="sort-by" class="select-field">
+            <option value="popularity.desc">Popularity Descending</option>
+            <option value="vote_average.desc">Rating Descending</option>
+            <option value="primary_release_date.desc">Release Date Descending</option>
+            <option value="revenue.desc">Box Office Revenue Descending</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label class="input-label" for="with-genres">Genres (comma-separated IDs)</label>
+          <input type="text" id="with-genres" class="input-field" value="28,12" placeholder="e.g. 28 (Action), 12 (Adv)" />
+        </div>
+        <div class="input-group" style="max-width: 140px;">
+          <label class="input-label" for="vote-count-gte">Min Votes</label>
+          <input type="number" id="vote-count-gte" class="input-field" value="1000" />
+        </div>
+        <button id="btn-fetch" class="btn-primary">Discover Movies</button>
+      </div>
+      <div class="quick-samples">
+        <span>Presets:</span>
+        <span class="sample-chip" data-sort="popularity.desc" data-genres="28,12" data-votes="1000">Blockbuster Action</span>
+        <span class="sample-chip" data-sort="vote_average.desc" data-genres="18" data-votes="2000">Acclaimed Dramas</span>
+        <span class="sample-chip" data-sort="popularity.desc" data-genres="878" data-votes="500">Popular Sci-Fi</span>
+        <span class="sample-chip" data-sort="revenue.desc" data-genres="" data-votes="500">All-Time Box Office</span>
+      </div>
+
+    </div>
+
+    <div class="view-tabs">
+      <div class="tab-group">
+        <button class="view-tab active" data-tab="visual">Visual View</button>
+        <button class="view-tab" data-tab="json">Raw JSON</button>
+        <button class="view-tab" data-tab="schema">Response Schema</button>
+      </div>
+      <div class="view-actions">
+        <button id="btn-copy-json" class="btn-secondary">Copy JSON</button>
+        <button id="btn-expand-json" class="btn-secondary">Expand All</button>
+        <button id="btn-collapse-json" class="btn-secondary">Collapse All</button>
+      </div>
+    </div>
+
+    <div id="pane-visual" class="view-pane active"></div>
+    <div id="pane-json" class="view-pane"></div>
+    <div id="pane-schema" class="view-pane"></div>
+  </div>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/explorer-core.js"></script>
+  <script>
+
+    const explorer = new TMDBExplorer({
+      endpoint: '/discover/movie',
+      mockKey: 'discover_movie',
+      defaultParams: {
+        sort_by: 'popularity.desc',
+        with_genres: '28,12',
+        'vote_count.gte': 1000
+      },
+      onRenderVisual: (data, container) => {
+        const results = data.results || [];
+        let cards = results.map(m => {
+          const poster = m.poster_path ? `${TMDB_IMAGE_BASE}w342${m.poster_path}` : 'https://placehold.co/342x513/1a1f2e/9ba6be?text=No+Poster';
+          return `
+            <div class="media-card">
+              <img src="${poster}" class="card-thumb" alt="${m.title}" />
+              <div class="card-body">
+                <div class="card-title" title="${m.title}">${m.title}</div>
+                <div class="card-sub">
+                  <span>${(m.release_date || '').slice(0, 4)}</span>
+                  <span class="card-rating">★ ${m.vote_average ? m.vote_average.toFixed(1) : 'NR'}</span>
+                </div>
+                <div class="card-sub" style="font-size: 11px; color: var(--text-dim);">
+                  <span>Votes: ${m.vote_count.toLocaleString()}</span>
+                  <span>Pop: ${m.popularity.toFixed(0)}</span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="section-title">
+            <span>Discovered Matches (Page ${data.page || 1} of ${data.total_pages || 1} - ${data.total_results.toLocaleString()} matches)</span>
+          </div>
+          <div class="card-grid">${cards}</div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-fetch').addEventListener('click', () => {
+      const sort = document.getElementById('sort-by').value;
+      const genres = document.getElementById('with-genres').value.trim();
+      const minVotes = document.getElementById('vote-count-gte').value.trim();
+      const params = { sort_by: sort };
+      if (genres) params.with_genres = genres;
+      if (minVotes) params['vote_count.gte'] = minVotes;
+      explorer.execute('/discover/movie', params);
+    });
+
+    document.querySelectorAll('.sample-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.getElementById('sort-by').value = chip.dataset.sort;
+        document.getElementById('with-genres').value = chip.dataset.genres;
+        document.getElementById('vote-count-gte').value = chip.dataset.votes;
+        document.getElementById('btn-fetch').click();
+      });
+    });
+
+    explorer.execute();
+
+  </script>
+</body>
+</html>

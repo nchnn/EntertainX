@@ -70,7 +70,7 @@
 
 ## Current Progress
 
-> **Estimated Score:** ~27 / 100 (Phases 1–2 complete)
+> **Estimated Score:** ~55 / 100 (Phases 1–3 complete)
 
 ### Definition of Done Checklist
 
@@ -88,11 +88,11 @@
 - [x] Dynamic sub-tab bar with category memory
 - [x] Smooth page transitions
 
-#### ⬜ 3. Movies & TV Shows
-- [ ] Zero-cost API search and discovery
-- [ ] Trending/popular grids on load
-- [ ] Rich detail view (poster, plot, genres, cast)
-- [ ] Movie vs. TV visual distinction
+#### ✅ 3. Movies & TV Shows
+- [x] Zero-cost API search and discovery (TMDB)
+- [x] Trending/popular grids on load (11 shelves: trending, categories, genres)
+- [x] Rich detail view (poster, plot, genres, cast, director, runtime, certification)
+- [x] Movie vs. TV visual distinction (kind chip, season count vs runtime)
 - [ ] Star ratings saved to SQLite
 - [ ] Add to personal lists
 

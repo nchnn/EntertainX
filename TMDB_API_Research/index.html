@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TMDB API Research & Interactive Explorer Hub</title>
+  <link rel="stylesheet" href="assets/css/explorer.css">
+  <style>
+    .hub-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 24px;
+      margin-top: 24px;
+    }
+    .hub-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .hub-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-3px);
+    }
+    .hub-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .hub-card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #fff;
+    }
+    .hub-card-count {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 12px;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .endpoint-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .endpoint-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      text-decoration: none;
+      color: var(--text-main);
+      transition: all 0.15s ease;
+    }
+    .endpoint-item:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent);
+      color: #fff;
+      padding-left: 18px;
+    }
+    .endpoint-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .endpoint-name {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .endpoint-path {
+      font-size: 11px;
+      color: var(--text-dim);
+      font-family: var(--code-font);
+    }
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin: 24px 0;
+    }
+    .stat-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px 22px;
+    }
+    .stat-num {
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-top: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API HUB</span>
+        <span class="nav-title">EntertainX Research Suite</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="#docs" class="btn-secondary">Technical Docs</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title" style="font-size: 32px;">The Movie Database (TMDB) API Explorer</h1>
+      <p class="page-desc" style="font-size: 15px;">
+        Exhaustive interactive API exploration, verified schema specifications, and visual response dashboards for Movies, Television, Cast, Search, and OTT Providers.
+      </p>
+    </header>
+
+    <div class="stat-row">
+      <div class="stat-box">
+        <div class="stat-num">44+</div>
+        <div class="stat-label">Verified Endpoints</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">22</div>
+        <div class="stat-label">Interactive Mockups</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">8</div>
+        <div class="stat-label">API Domains</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-num">100%</div>
+        <div class="stat-label">Offline Mock Coverage</div>
+      </div>
+    </div>
+
+    <div class="control-card" style="padding: 14px 20px;">
+      <div class="control-row">
+        <div class="input-group">
+          <input type="text" id="filter-input" class="input-field" placeholder="Filter endpoints, paths, or categories..." />
+        </div>
+      </div>
+    </div>
+
+    <div class="hub-grid" id="hub-catalog">
+      <!-- 1. Movies -->
+      <div class="hub-card" data-category="movies">
+        <div class="hub-card-header">
+          <div>
+            <div class="hub-card-title">Movies Ecosystem</div>
+            <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Theatrical releases, box office, media, credits</p>
+          </div>
+          <span class="hub-card-count">6 Mockups</span>
+        </div>
+        <div class="endpoint-list">
+          <a href="movies/movie_details.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Movie Details & Append</span>
+              <span class="endpoint-path">GET /movie/{id}</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="movies/movie_credits.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Movie Cast & Crew Credits</span>
+              <span class="endpoint-path">GET /movie/{id}/credits</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="movies/movie_lists.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Curated Movie Lists</span>
+              <span class="endpoint-path">GET /movie/{popular|top_rated...}</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="movies/movie_images_videos.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Posters, Backdrops & Logos</span>
+              <span class="endpoint-path">GET /movie/{id}/images</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="movies/movie_recommendations_similar.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Recommendations & Similar</span>
+              <span class="endpoint-path">GET /movie/{id}/recommendations</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="movies/movie_release_keywords.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Release Dates & Age Certifications</span>
+              <span class="endpoint-path">GET /movie/{id}/release_dates</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 2. TV Shows -->
+      <div class="hub-card" data-category="tv">
+        <div class="hub-card-header">
+          <div>
+            <div class="hub-card-title">TV Shows Ecosystem</div>
+            <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Episodic content, seasons, networks, ratings</p>
+          </div>
+          <span class="hub-card-count">6 Mockups</span>
+        </div>
+        <div class="endpoint-list">
+          <a href="tv_shows/tv_details.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">TV Show Details</span>
+              <span class="endpoint-path">GET /tv/{series_id}</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="tv_shows/tv_seasons_episodes.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Seasons & Episodes</span>
+              <span class="endpoint-path">GET /tv/{id}/season/{s}</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="tv_shows/tv_credits.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">TV Aggregate Credits</span>
+              <span class="endpoint-path">GET /tv/{id}/aggregate_credits</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="tv_shows/tv_lists.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Broadcast Lists (On-Air/Today)</span>
+              <span class="endpoint-path">GET /tv/{airing_today|popular...}</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="tv_shows/tv_images_videos.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">TV Artwork & Assets</span>
+              <span class="endpoint-path">GET /tv/{id}/images</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="tv_shows/tv_ratings_keywords.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Global TV Content Ratings</span>
+              <span class="endpoint-path">GET /tv/{id}/content_ratings</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 3. People -->
+      <div class="hub-card" data-category="people">
+        <div class="hub-card-header">
+          <div>
+            <div class="hub-card-title">People & Talents</div>
+            <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Actors, directors, biographies, combined credits</p>
+          </div>
+          <span class="hub-card-count">3 Mockups</span>
+        </div>
+        <div class="endpoint-list">
+          <a href="people/person_details.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Person Details & Bio</span>
+              <span class="endpoint-path">GET /person/{id}</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="people/person_credits.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Combined Filmography</span>
+              <span class="endpoint-path">GET /person/{id}/combined_credits</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="people/person_popular.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Popular People Ranking</span>
+              <span class="endpoint-path">GET /person/popular</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 4. Search -->
+      <div class="hub-card" data-category="search">
+        <div class="hub-card-header">
+          <div>
+            <div class="hub-card-title">Search APIs</div>
+            <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Multi-index query engine, movie/tv searches</p>
+          </div>
+          <span class="hub-card-count">3 Mockups</span>
+        </div>
+        <div class="endpoint-list">
+          <a href="search/search_multi.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Multi-Search (All Domains)</span>
+              <span class="endpoint-path">GET /search/multi</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="search/search_movies.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Search Movies</span>
+              <span class="endpoint-path">GET /search/movie</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="search/search_tv.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Search TV Shows</span>
+              <span class="endpoint-path">GET /search/tv</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 5. Discover & Trending -->
+      <div class="hub-card" data-category="discover trending">
+        <div class="hub-card-header">
+          <div>
+            <div class="hub-card-title">Discovery & Trending</div>
+            <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Parametric filtering, viral trajectory</p>
+          </div>
+          <span class="hub-card-count">3 Mockups</span>
+        </div>
+        <div class="endpoint-list">
+          <a href="discover/discover_movies.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Discover Movies (Faceted)</span>
+              <span class="endpoint-path">GET /discover/movie</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="discover/discover_tv.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Discover TV Shows</span>
+              <span class="endpoint-path">GET /discover/tv</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="trending/trending.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Trending Matrix (Day/Week)</span>
+              <span class="endpoint-path">GET /trending/{type}/{time}</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 6. Reference & Infrastructure -->
+      <div class="hub-card" data-category="reference">
+        <div class="hub-card-header">
+          <div>
+            <div class="hub-card-title">Reference & Providers</div>
+            <p style="font-size: 12px; color: var(--text-dim); margin-top: 2px;">Taxonomies, CDN topologies, JustWatch data</p>
+          </div>
+          <span class="hub-card-count">4 Mockups</span>
+        </div>
+        <div class="endpoint-list">
+          <a href="reference/genres_certifications.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Genres & Certifications</span>
+              <span class="endpoint-path">GET /genre/{type}/list</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="reference/watch_providers.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Watch Providers (JustWatch)</span>
+              <span class="endpoint-path">GET /watch/providers/movie</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="reference/collections.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">Franchise Collections</span>
+              <span class="endpoint-path">GET /collection/{id}</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+          <a href="reference/configuration.html" class="endpoint-item">
+            <div class="endpoint-meta">
+              <span class="endpoint-name">CDN Topology & Dimensions</span>
+              <span class="endpoint-path">GET /configuration</span>
+            </div>
+            <span style="color: var(--accent);">→</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Documentation section -->
+    <div id="docs" style="margin-top: 48px; border-top: 1px solid var(--border); padding-top: 24px;">
+      <h2 style="font-size: 22px; font-weight: 700; color: #fff; margin-bottom: 16px;">Technical Research Documentation</h2>
+      <div class="stat-row">
+        <a href="documentation/API_CATALOG.md" class="stat-box" style="text-decoration: none; display: block;">
+          <div style="font-size: 16px; font-weight: 700; color: #60a5fa;">API_CATALOG.md →</div>
+          <div class="stat-label">Full endpoint catalogue with parameters and status</div>
+        </a>
+        <a href="documentation/ENDPOINT_REFERENCE.md" class="stat-box" style="text-decoration: none; display: block;">
+          <div style="font-size: 16px; font-weight: 700; color: #60a5fa;">ENDPOINT_REFERENCE.md →</div>
+          <div class="stat-label">Detailed request query matrix and parameter types</div>
+        </a>
+        <a href="documentation/RESPONSE_SCHEMAS.md" class="stat-box" style="text-decoration: none; display: block;">
+          <div style="font-size: 16px; font-weight: 700; color: #60a5fa;">RESPONSE_SCHEMAS.md →</div>
+          <div class="stat-label">Typed response data contracts and nullability</div>
+        </a>
+        <a href="documentation/RESEARCH_NOTES.md" class="stat-box" style="text-decoration: none; display: block;">
+          <div style="font-size: 16px; font-weight: 700; color: #60a5fa;">RESEARCH_NOTES.md →</div>
+          <div class="stat-label">EntertainX integration patterns, rate limits, append rules</div>
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/explorer-core.js"></script>
+  <script>
+    const explorer = new TMDBExplorer();
+
+    // Client-side instant filter
+    const filterInput = document.getElementById('filter-input');
+    filterInput.addEventListener('input', (e) => {
+      const q = e.target.value.toLowerCase().trim();
+      document.querySelectorAll('.endpoint-item').forEach(item => {
+        const text = item.textContent.toLowerCase();
+        const matches = text.includes(q);
+        item.style.display = matches ? 'flex' : 'none';
+      });
+
+      document.querySelectorAll('.hub-card').forEach(card => {
+        const visibleItems = card.querySelectorAll('.endpoint-item[style="display: flex;"]');
+        const anyVisible = visibleItems.length > 0 || !q;
+        card.style.display = anyVisible ? 'flex' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

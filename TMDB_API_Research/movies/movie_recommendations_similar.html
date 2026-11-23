@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Movie Recommendations & Similar - TMDB API Research</title>
+  <link rel="stylesheet" href="../assets/css/explorer.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="top-nav">
+      <div class="nav-brand">
+        <span class="brand-badge">TMDB API</span>
+        <span class="nav-title">Movies / Movie Recommendations & Similar</span>
+      </div>
+      <div class="nav-actions">
+        <span id="api-status-badge" class="badge badge-mock">
+          <span class="badge-dot"></span> Simulated Mode
+        </span>
+        <button class="btn-secondary open-key-modal">Configure API Key</button>
+        <a href="../index.html" class="btn-secondary">Overview Index</a>
+      </div>
+    </nav>
+
+    <header class="page-header">
+      <h1 class="page-title">
+        <span class="endpoint-method">GET</span>
+        <span>Movie Recommendations & Similar</span>
+      </h1>
+      <div class="endpoint-url">https://api.themoviedb.org/3/movie/{movie_id}/recommendations</div>
+      <p class="page-desc">Explore algorithmic recommendations and keyword-based similar content.</p>
+    </header>
+
+    <div class="control-card">
+      
+      <div class="control-row">
+        <div class="input-group">
+          <label class="input-label" for="movie-id">Movie ID</label>
+          <input type="number" id="movie-id" class="input-field" value="550" />
+        </div>
+        <div class="input-group">
+          <label class="input-label" for="rec-type">Relationship Type</label>
+          <select id="rec-type" class="select-field">
+            <option value="recommendations">Recommendations (/movie/{id}/recommendations)</option>
+            <option value="similar">Similar Titles (/movie/{id}/similar)</option>
+          </select>
+        </div>
+        <button id="btn-fetch" class="btn-primary">Query Relations</button>
+      </div>
+      <div class="quick-samples">
+        <span>Quick Samples:</span>
+        <span class="sample-chip" data-id="550">Fight Club (550)</span>
+        <span class="sample-chip" data-id="27205">Inception (27205)</span>
+        <span class="sample-chip" data-id="155">The Dark Knight (155)</span>
+      </div>
+
+    </div>
+
+    <div class="view-tabs">
+      <div class="tab-group">
+        <button class="view-tab active" data-tab="visual">Visual View</button>
+        <button class="view-tab" data-tab="json">Raw JSON</button>
+        <button class="view-tab" data-tab="schema">Response Schema</button>
+      </div>
+      <div class="view-actions">
+        <button id="btn-copy-json" class="btn-secondary">Copy JSON</button>
+        <button id="btn-expand-json" class="btn-secondary">Expand All</button>
+        <button id="btn-collapse-json" class="btn-secondary">Collapse All</button>
+      </div>
+    </div>
+
+    <div id="pane-visual" class="view-pane active"></div>
+    <div id="pane-json" class="view-pane"></div>
+    <div id="pane-schema" class="view-pane"></div>
+  </div>
+
+  <script src="../assets/js/mock-data.js"></script>
+  <script src="../assets/js/explorer-core.js"></script>
+  <script>
+
+    const explorer = new TMDBExplorer({
+      endpoint: '/movie/550/recommendations',
+      mockKey: 'movie_recommendations',
+      onRenderVisual: (data, container) => {
+        const results = data.results || [];
+        let cards = results.slice(0, 15).map(m => {
+          const poster = m.poster_path ? `${TMDB_IMAGE_BASE}w342${m.poster_path}` : 'https://placehold.co/342x513/1a1f2e/9ba6be?text=No+Poster';
+          return `
+            <div class="media-card">
+              <img src="${poster}" class="card-thumb" alt="${m.title}" />
+              <div class="card-body">
+                <div class="card-title" title="${m.title}">${m.title}</div>
+                <div class="card-sub">
+                  <span>${(m.release_date || '').slice(0, 4)}</span>
+                  <span class="card-rating">★ ${m.vote_average ? m.vote_average.toFixed(1) : 'NR'}</span>
+                </div>
+                <p style="font-size: 11px; color: var(--text-dim); margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;">
+                  ${m.overview || 'No synopsis.'}
+                </p>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+        container.innerHTML = `
+          <div class="section-title">
+            <span>Related Movies (${results.length} results returned)</span>
+          </div>
+          <div class="card-grid">${cards}</div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-fetch').addEventListener('click', () => {
+      const id = document.getElementById('movie-id').value.trim() || '550';
+      const type = document.getElementById('rec-type').value;
+      explorer.mockKey = `movie_${type}`;
+      explorer.execute(`/movie/${id}/${type}`);
+    });
+
+    document.querySelectorAll('.sample-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        document.getElementById('movie-id').value = chip.dataset.id;
+        document.getElementById('btn-fetch').click();
+      });
+    });
+
+    explorer.execute();
+
+  </script>
+</body>
+</html>
