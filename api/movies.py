@@ -106,6 +106,32 @@ class MediaItem:
 
 
 @dataclass(frozen=True)
+class SeasonInfo:
+    """One season of a TV show, as listed on the detail page."""
+
+    number: int
+    name: str
+    episode_count: int = 0
+    air_date: str = ""
+
+
+@dataclass(frozen=True)
+class Episode:
+    """One episode of a TV season."""
+
+    number: int
+    name: str
+    overview: str = ""
+    runtime: int = 0
+    still_path: str = ""
+    air_date: str = ""
+
+    @property
+    def still_url(self) -> str:
+        return f"{IMAGE_BASE}/w300{self.still_path}" if self.still_path else ""
+
+
+@dataclass(frozen=True)
 class MediaDetails:
     item: MediaItem
     tagline: str = ""
@@ -121,6 +147,7 @@ class MediaDetails:
     english_backdrop_path: str = ""
     textless_backdrop_path: str = ""
     english_poster_path: str = ""
+    seasons: tuple[SeasonInfo, ...] = ()
 
     def logo_url(self, size: str = "w500") -> str:
         return f"{IMAGE_BASE}/{size}{self.logo_path}" if self.logo_path else ""
@@ -349,6 +376,21 @@ def parse_details(raw: dict, media_type: str, region: str = "US") -> MediaDetail
     en_backdrop = pick_english_image(imgs.get("backdrops", []), item.backdrop_path)
     en_poster = pick_english_image(imgs.get("posters", []), item.poster_path)
 
+    seasons: tuple[SeasonInfo, ...] = ()
+    if media_type == "tv":
+        seasons = tuple(
+            SeasonInfo(
+                number=int(season["season_number"]),
+                name=str(season.get("name") or f"Season {season['season_number']}"),
+                episode_count=int(season.get("episode_count") or 0),
+                air_date=str(season.get("air_date") or ""),
+            )
+            for season in raw.get("seasons", [])
+            if isinstance(season, dict)
+            and isinstance(season.get("season_number"), int)
+            and int(season["season_number"]) > 0
+        )
+
     from dataclasses import replace
     updated_item = replace(item, backdrop_path=en_backdrop, poster_path=en_poster)
 
@@ -367,6 +409,7 @@ def parse_details(raw: dict, media_type: str, region: str = "US") -> MediaDetail
         english_backdrop_path=en_backdrop,
         textless_backdrop_path=en_backdrop,
         english_poster_path=en_poster,
+        seasons=seasons,
     )
 
 
@@ -446,6 +489,25 @@ class TmdbClient:
             include_image_language="en,null",
         )
         return parse_details(raw, media_type, self._region or "US")
+
+    def episodes(self, ident: int, season: int) -> list[Episode]:
+        """Every episode of one season; used by the TV player's episode list."""
+        payload = self._get(f"/tv/{ident}/season/{season}", ttl=DETAIL_TTL)
+        episodes: list[Episode] = []
+        for raw in payload.get("episodes", []):
+            if not isinstance(raw, dict) or not isinstance(raw.get("episode_number"), int):
+                continue
+            episodes.append(
+                Episode(
+                    number=int(raw["episode_number"]),
+                    name=str(raw.get("name") or f"Episode {raw['episode_number']}"),
+                    overview=str(raw.get("overview") or ""),
+                    runtime=int(raw.get("runtime") or 0),
+                    still_path=str(raw.get("still_path") or ""),
+                    air_date=str(raw.get("air_date") or ""),
+                )
+            )
+        return episodes
 
     # ── HTTP + cache ────────────────────────────────────────────────────────
     def _get(self, path: str, ttl: int = LIST_TTL, **params) -> dict:  # type: ignore[misc]

@@ -43,7 +43,6 @@
 
 ## Key Constraints
 
-- **No** full movie/music streaming, piracy, cloud sync, or social features
 - **No** `webbrowser.open()` or external process spawning for games
 - All API calls on background threads; never block the Qt main thread
 - Parameterized SQL queries only (`?` placeholders); no f-string SQL

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EntertainX Player</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/player.css">
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js"></script>
+  <script>
+    // Pinned hls.js from the CDN; fall back to the identical release on unpkg.
+    if (!window.Hls) {
+      document.write('<script src="https://unpkg.com/hls.js@1.5.13/dist/hls.min.js"><\/script>');
+    }
+  </script>
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+  <script src="/assets/player.js" defer></script>
+</head>
+<body>
+  <main class="app" id="app">
+    <div class="backdrop" id="poster" aria-hidden="true"></div>
+    <video id="video" playsinline preload="metadata" aria-label="Video player"></video>
+    <div class="scrim" aria-hidden="true"></div>
+
+    <div class="chrome" id="chrome">
+      <header class="topbar">
+        <button class="icon-btn back" id="btn-back" data-icon="arrow-left" aria-label="Back to browse" title="Back to browse"></button>
+        <div class="now-title" id="top-title"></div>
+        <div class="topbar-spacer" aria-hidden="true"></div>
+      </header>
+
+      <section class="hero" id="hero">
+        <p class="eyebrow">You&rsquo;re watching</p>
+        <h1 class="title" id="title"></h1>
+        <div class="chips" id="chips"></div>
+        <p class="tagline" id="tagline" hidden></p>
+        <p class="synopsis" id="synopsis"></p>
+      </section>
+
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+      <footer class="controls" id="controls">
+        <div class="progress" id="progress" role="slider" tabindex="0"
+             aria-label="Seek" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="track"><div class="buffered" id="buffered"></div><div class="played" id="played"></div></div>
+          <div class="knob" id="knob"></div>
+        </div>
+        <div class="control-row">
+          <div class="control-group left">
+            <button class="icon-btn play" id="btn-play" data-icon="play" aria-label="Play"></button>
+            <button class="icon-btn skip" id="btn-rew" data-icon="rotate-ccw" aria-label="Rewind 10 seconds" title="Rewind 10s"></button>
+            <button class="icon-btn skip" id="btn-fwd" data-icon="rotate-cw" aria-label="Forward 10 seconds" title="Forward 10s"></button>
+            <div class="volume" id="volume-group">
+              <button class="icon-btn" id="btn-mute" data-icon="volume-2" aria-label="Mute" title="Mute"></button>
+              <input type="range" id="volume" class="volume-slider" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+            </div>
+            <span class="time" aria-label="Playback time"><span id="time-cur">0:00</span> / <span id="time-dur">0:00</span></span>
+          </div>
+          <div class="control-group right">
+            <button class="icon-btn" id="btn-cc" data-icon="captions" aria-label="Subtitles" title="Subtitles"></button>
+            <button class="icon-btn" id="btn-panel" data-icon="list-video" aria-label="Servers and episodes" title="Servers and episodes"></button>
+            <button class="icon-btn" id="btn-settings" data-icon="settings" aria-label="Playback settings" title="Playback settings"></button>
+            <button class="icon-btn" id="btn-pip" data-icon="picture-in-picture-2" aria-label="Picture in picture" title="Picture in picture"></button>
+            <button class="icon-btn" id="btn-fs" data-icon="maximize" aria-label="Fullscreen" title="Fullscreen"></button>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <button class="type-tab" id="type-tab" aria-label="Open servers and episodes" aria-expanded="false">
+      <span class="tab-caret" data-icon="chevron-right" aria-hidden="true"></span>
+      <span class="tab-dot" aria-hidden="true"></span>
+      <span class="tab-text" id="type-text">MOVIE</span>
+    </button>
+
+    <div class="status loading" id="loading" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="loading-text">Finding a stream&hellip;</p>
+    </div>
+
+    <div class="status error-state" id="error-state" role="alert" hidden>
+      <div class="error-mark" aria-hidden="true"><span data-icon="film"></span></div>
+      <h2>No video source found for this title.</h2>
+      <p>Try another server or check back later.</p>
+      <div class="error-actions">
+        <div class="select-wrap">
+          <select id="error-server" aria-label="Choose a streaming server"></select>
+          <span class="select-caret" data-icon="chevron-down" aria-hidden="true"></span>
+        </div>
+        <button class="retry" id="btn-retry">Retry</button>
+      </div>
+    </div>
+
+    <aside class="side-panel" id="side-panel" aria-label="Servers, episodes and title information" aria-hidden="true">
+      <button class="icon-btn panel-close" id="panel-close" data-icon="close" aria-label="Close panel"></button>
+
+      <div class="server-row">
+        <label class="eyebrow" for="server-select">Server</label>
+        <div class="select-wrap">
+          <select id="server-select" aria-label="Streaming server"></select>
+          <span class="select-caret" data-icon="chevron-down" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <div class="info-card">
+        <img id="card-art" alt="" loading="lazy">
+        <div class="info-card-scrim" aria-hidden="true"></div>
+        <h2 id="card-title"></h2>
+      </div>
+
+      <div class="chips compact" id="card-chips"></div>
+
+      <section class="panel-section" id="episodes-section" hidden>
+        <div class="server-row">
+          <label class="eyebrow" for="season-select">Season</label>
+          <div class="select-wrap">
+            <select id="season-select" aria-label="Season"></select>
+            <span class="select-caret" data-icon="chevron-down" aria-hidden="true"></span>
+          </div>
+        </div>
+        <div class="episode-list" id="episode-list"></div>
+      </section>
+
+      <section class="panel-section">
+        <p class="eyebrow">Overview</p>
+        <p class="panel-overview" id="card-overview"></p>
+      </section>
+    </aside>
+
+    <div class="popover" id="settings-menu" hidden role="menu" aria-label="Playback settings">
+      <p class="popover-label">Playback speed</p>
+      <div class="speed-grid" id="speed-grid"></div>
+    </div>
+  </main>
+  <noscript>This player needs JavaScript.</noscript>
+</body>
+</html>

@@ -209,7 +209,7 @@ Do not require:
 
 Use local SQLite for accounts, preferences, and favorites.
 
-Respect API rate limits, licensing, copyright, and provider terms.
+Respect API rate limits, licensing, and provider terms.
 
 Never silently switch to paid services.
 
