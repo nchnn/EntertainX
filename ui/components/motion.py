@@ -95,6 +95,49 @@ class MotionEffect(QGraphicsEffect):
         painter.restore()
 
 
+class ScaleFadeEffect(QGraphicsEffect):
+    """Draws the widget scaled about ``anchor`` and faded; ``progress`` 1 is rest."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._progress = 1.0
+        self._anchor = QPointF(0.5, 0.5)
+
+    def set_anchor(self, fx: float, fy: float) -> None:
+        self._anchor = QPointF(fx, fy)
+
+    def set_progress(self, value: float) -> None:
+        value = max(0.0, min(1.0, float(value)))
+        if value != self._progress:
+            self._progress = value
+            self.update()
+
+    def draw(self, painter) -> None:
+        if self._progress <= 0.0:
+            return
+        offset = QPoint()
+        pixmap = self.sourcePixmap(
+            Qt.CoordinateSystem.LogicalCoordinates,
+            offset,
+            QGraphicsEffect.PixmapPadMode.NoPad,
+        )
+        if pixmap.isNull():
+            return
+        ratio = pixmap.devicePixelRatio() or 1.0
+        width, height = pixmap.width() / ratio, pixmap.height() / ratio
+        scale = 0.84 + 0.16 * self._progress
+        center = QPointF(offset) + QPointF(
+            width * self._anchor.x(), height * self._anchor.y()
+        )
+        painter.save()
+        painter.setOpacity(painter.opacity() * self._progress)
+        painter.translate(center)
+        painter.scale(scale, scale)
+        painter.translate(-center)
+        painter.drawPixmap(QPointF(offset), pixmap)
+        painter.restore()
+
+
 # ── Internals ───────────────────────────────────────────────────────────────
 def _set_progress(effect: MotionEffect, value) -> None:
     try:

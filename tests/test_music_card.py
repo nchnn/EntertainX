@@ -1,148 +1,164 @@
-import re
+"""Tests for EntertainX music models, audio engine, components, and page."""
 
 import pytest
 from PySide6.QtCore import Qt
 
-from theme import theme_manager as theme
-from ui.components.music_card import (
-    AlbumArt,
-    MusicPlayerCard,
-    PlayerProgress,
-    duration_ms,
-    format_duration,
+from api.music import MusicClient, decrypt_jiosaavn_url
+from ui.components.music.artist_header import ArtistHeader
+from ui.components.music.audio_engine import AudioEngine, get_audio_engine
+from ui.components.music.lyrics_view import LyricsView
+from ui.components.music.models import (
+    ArtistProfile,
+    LyricLine,
+    Track,
+    format_time,
+    parse_duration,
+    parse_lrc,
 )
+from ui.components.music.player_bar import PlayerBar
+from ui.components.music.queue_drawer import QueueDrawer
+from ui.components.music.track_card import AlbumCover, TrackCard
+from ui.components.music.track_row import TrackRow
 from ui.pages.music import MusicPage
-from ui.pages.sample_data import ALBUMS
 
 
-def test_duration_parses_minutes_and_hours():
-    assert duration_ms("3:42") == 222_000
-    assert duration_ms("1:02:03") == 3_723_000
+def test_format_time():
+    assert format_time(0) == "0:00"
+    assert format_time(65_000) == "1:05"
+    assert format_time(222_000) == "3:42"
+    assert format_time(-500) == "0:00"
 
 
-@pytest.mark.parametrize("text", ["", "nope", "3", "3:xx"])
-def test_duration_falls_back_for_bad_input(text):
-    assert duration_ms(text) == 180_000
+def test_parse_duration():
+    assert parse_duration("3:42") == 222_000
+    assert parse_duration(180) == 180_000
+    assert parse_duration(180_000) == 180_000
+    assert parse_duration("") == 180_000
 
 
-def test_format_duration_clamps_and_pads():
-    assert format_duration(0) == "0:00"
-    assert format_duration(111_000) == "1:51"
-    assert format_duration(-500) == "0:00"
-
-
-def test_progress_value_is_clamped(app):
-    bar = PlayerProgress()
-    bar.set_value(1.4)
-    assert bar.value() == 1.0
-    bar.set_value(-0.2)
-    assert bar.value() == 0.0
-
-
-def test_album_art_side_is_deterministic(app):
-    art = AlbumArt("Soft Static")
-    assert art.disc_side() in (-1, 1)
-    assert art.disc_side() == AlbumArt("Soft Static").disc_side()
-
-
-def test_player_card_exposes_text_and_search(app):
-    card = MusicPlayerCard("Soft Static", "Mira Vale", "10 tracks", "3:42")
-    assert card.title == "Soft Static"
-    assert card.subtitle_label.full_text() == "Mira Vale"
-    assert card.meta_label.full_text() == "10 tracks"
-    assert card.matches("mira")
-    assert card.matches("tracks")
-    assert not card.matches("zzzz")
-
-
-def test_player_card_elides_long_text_without_widening(app):
-    card = MusicPlayerCard(
-        "A very long album title " * 4, "An artist", "10 tracks", "3:42"
+def test_parse_lrc_synced_timestamps():
+    lrc = (
+        "[00:22.76] Humingang malalim, pumikit na muna\n"
+        "[00:31.76] At baka sakaling namamalikmata lang\n"
     )
-    assert card.minimumSizeHint().width() == theme.CARD_MIN_WIDTH
+    lines = parse_lrc(lrc)
+    assert len(lines) == 2
+    assert lines[0].time_ms == 22760
+    assert lines[0].text == "Humingang malalim, pumikit na muna"
+    assert lines[1].time_ms == 31760
+    assert lines[1].text == "At baka sakaling namamalikmata lang"
 
 
-def test_play_toggle_switches_state_and_glyph(app):
-    card = MusicPlayerCard("Soft Static", "Mira Vale", "10 tracks", "3:42")
-    assert not card.is_playing()
-    assert card._button.toolTip() == "Play Soft Static"
-
-    card.toggle()
-    assert card.is_playing()
-    assert card._button.toolTip() == "Pause Soft Static"
-
-    card.toggle()
-    assert not card.is_playing()
-    assert card._button.toolTip() == "Play Soft Static"
-
-
-def test_play_disc_is_keyboard_reachable_and_named(app):
-    card = MusicPlayerCard("Soft Static", "Mira Vale", "10 tracks", "3:42")
-    assert card._button.focusPolicy() != Qt.FocusPolicy.NoFocus
-    assert card._button.accessibleName() == "Play Soft Static"
+def test_track_model_properties():
+    track = Track(
+        id="test_1",
+        title="Multo",
+        artist="Cup of Joe",
+        album="Sagada",
+        duration_ms=222_000,
+        artwork_url="https://example.com/art.jpg",
+        stream_url="https://example.com/stream.mp4",
+        quality="320KBPS",
+    )
+    assert track.duration_formatted == "3:42"
+    d = track.to_dict()
+    assert d["title"] == "Multo"
+    assert d["quality"] == "320KBPS"
 
 
-def test_progress_updates_bar_and_elapsed(app):
-    card = MusicPlayerCard("A", "B", "1 track", "3:42")
-    card.play()
-    card._animation.setCurrentTime(111_000)
-    assert card._progress == pytest.approx(0.5, abs=0.02)
-    assert card._progress_bar.value() == pytest.approx(0.5, abs=0.02)
-    assert card._elapsed_label.text() == "1:51"
-    card.pause()
+def test_decrypt_jiosaavn_url():
+    # Token from earlier test run
+    enc = "ID2ieOjCrwfgWvL5sXl4B1ImC5QfbsDyft5bxAtreIQ10KxXW0VFxQNMSPN3mCrWvICJvxKdvsjZrsW62Wv7Fhw7tS9a8Gtq"
+    url = decrypt_jiosaavn_url(enc)
+    assert url.startswith("https://aac.saavncdn.com/")
+    assert "_96.mp4" in url
 
 
-def test_resume_keeps_the_remaining_time(app):
-    card = MusicPlayerCard("A", "B", "1 track", "0:10")
-    card.play()
-    card._animation.setCurrentTime(5_000)
-    card.pause()
-    card.play()
-    assert card._animation.duration() == pytest.approx(5_000, abs=50)
-    assert card._progress == pytest.approx(0.5, abs=0.01)
-    card.pause()
+def test_audio_engine_queue_and_playback(app):
+    engine = AudioEngine()
+    t1 = Track(id="1", title="Track 1", artist="Artist 1", stream_url="https://example.com/1.mp3")
+    t2 = Track(id="2", title="Track 2", artist="Artist 2", stream_url="https://example.com/2.mp3")
+
+    engine.play_queue([t1, t2], start_index=0)
+    assert engine.current_track is not None
+    assert engine.current_track.id == "1"
+    assert len(engine.queue) == 2
+
+    # Volume control
+    engine.set_volume(0.5)
+    assert pytest.approx(engine.volume, abs=0.05) == 0.5
+
+    # Shuffle and repeat toggles
+    assert not engine.is_shuffle
+    engine.toggle_shuffle()
+    assert engine.is_shuffle
+
+    assert not engine.is_repeat
+    engine.toggle_repeat()
+    assert engine.is_repeat
+
+    # Next track
+    engine.next_track()
+    assert engine.current_track is not None
 
 
-def test_finishing_resets_to_the_start(app):
-    card = MusicPlayerCard("A", "B", "1 track", "3:42")
-    card.play()
-    card._on_finished()
-    assert not card.is_playing()
-    assert card._elapsed_label.text() == "0:00"
-    assert card._progress_bar.value() == 0.0
+def test_track_card_widget(app):
+    track = Track(id="1", title="Multo", artist="Cup of Joe", quality="320KBPS")
+    card = TrackCard(track)
+    assert card.title_label.text() == "Multo"
+    assert card.artist_label.text() == "Cup of Joe"
+    assert card.width() == 176
 
 
-@pytest.mark.parametrize("length", ["", "nope"])
-def test_missing_length_uses_three_minutes(app, length):
-    card = MusicPlayerCard("A", "B", "1 track", length)
-    assert card._track_ms == 180_000
-    assert card._total_label.text() == "3:00"
+def test_track_row_widget(app):
+    track = Track(id="1", title="Multo", artist="Cup of Joe", duration_ms=222_000)
+    row = TrackRow(track, index=1)
+    assert row.title_label.text() == "Multo"
+    assert row.duration_label.text() == "3:42"
 
 
-def test_every_album_has_a_valid_length():
-    assert all(re.fullmatch(r"\d+:\d{2}", album["length"]) for album in ALBUMS)
+def test_player_bar_widget(app):
+    bar = PlayerBar()
+    assert bar.title_label.text() == "No track playing"
+    assert bar.pos_label.text() == "0:00"
+    assert bar.dur_label.text() == "0:00"
 
 
-def test_music_page_uses_player_cards(app):
+def test_lyrics_view_widget(app):
+    lyrics_view = LyricsView()
+    lines = [
+        LyricLine(time_ms=1000, text="First line"),
+        LyricLine(time_ms=5000, text="Second line"),
+    ]
+    lyrics_view._on_lyrics_loaded(lines)
+    assert len(lyrics_view._rows) == 2
+    assert lyrics_view._rows[0].text() == "First line"
+
+
+def test_queue_drawer_widget(app):
+    drawer = QueueDrawer()
+    assert drawer.now_title.text() == "No track playing"
+
+
+def test_artist_header_widget(app):
+    profile = ArtistProfile(
+        id="cup-of-joe",
+        name="Cup of Joe",
+        monthly_listeners="12M monthly audience",
+        bio="OPM indie band.",
+    )
+    header = ArtistHeader(profile)
+    assert header.name_label.text() == "Cup of Joe"
+
+
+def test_music_page_builds_with_header_and_shelves(app):
     page = MusicPage()
-    assert len(page.grid.cards) == len(ALBUMS)
-    assert all(isinstance(card, MusicPlayerCard) for card in page.grid.cards)
-    assert page.grid.cards[0].title == ALBUMS[0]["title"]
+    assert page.title == "Music"
+    assert page.header.title == "Music"
+    assert hasattr(page, "search")
+    assert hasattr(page, "player_bar")
+    assert hasattr(page, "lyrics_view")
+    assert hasattr(page, "queue_drawer")
+    assert hasattr(page, "shelf_albums")
+    assert hasattr(page, "shelf_trending")
 
-
-def test_starting_one_card_pauses_the_others(app):
-    page = MusicPage()
-    first, second = page.grid.cards[0], page.grid.cards[1]
-    first.toggle()
-    assert first.is_playing()
-
-    second.toggle()
-    assert second.is_playing()
-    assert not first.is_playing()
-
-
-def test_filtering_out_a_playing_card_pauses_it(app):
-    page = MusicPage()
-    page.grid.cards[0].toggle()
-    page.search.setText("Pink Hours")
-    assert not page.grid.cards[0].is_playing()

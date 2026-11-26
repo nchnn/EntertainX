@@ -12,11 +12,14 @@ import ctypes
 import sys
 from ctypes import wintypes
 
-from PySide6.QtCore import QEvent, QPoint, Qt, Signal
+from PySide6.QtCore import Property, QEasingCurve, QEvent, QPoint, QPropertyAnimation, Qt, QTimer, Signal
+from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMenu,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -40,7 +43,10 @@ _HTBOTTOMRIGHT = 17
 
 
 class TitleBar(QWidget):
-    """Brand strip with drag support and window controls."""
+    """Auto-hiding brand strip with drag support, user avatar, and window controls."""
+
+    COLLAPSED_HEIGHT = 0
+    EXPANDED_HEIGHT = theme.TITLEBAR_HEIGHT
 
     minimize_requested = Signal()
     maximize_requested = Signal()
@@ -49,9 +55,21 @@ class TitleBar(QWidget):
     def __init__(self, title: str = "EntertainX", parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("TitleBar")
-        self.setFixedHeight(theme.TITLEBAR_HEIGHT)
+        self.setMouseTracking(True)
+        self._current_height = self.COLLAPSED_HEIGHT
+        self.setFixedHeight(self._current_height)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self._drag_offset: QPoint | None = None
+        self._menu_open = False
+
+        self._anim = QPropertyAnimation(self, b"bar_height", self)
+        self._anim.setDuration(200)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self._leave_timer = QTimer(self)
+        self._leave_timer.setSingleShot(True)
+        self._leave_timer.setInterval(150)
+        self._leave_timer.timeout.connect(self._do_collapse)
 
         row = QHBoxLayout(self)
         row.setContentsMargins(theme.SPACE_MD, 0, 0, 0)
@@ -82,6 +100,53 @@ class TitleBar(QWidget):
 
         for button in (self.minimize_button, self.maximize_button, self.close_button):
             row.addWidget(button, 0, Qt.AlignmentFlag.AlignVCenter)
+
+    # ── Property for smooth height animation ────────────────────────────────
+    def _get_bar_height(self) -> int:
+        return self._current_height
+
+    def _set_bar_height(self, height: int) -> None:
+        self._current_height = height
+        self.setFixedHeight(height)
+
+    bar_height = Property(int, _get_bar_height, _set_bar_height)
+
+    def is_menu_open(self) -> bool:
+        return self._menu_open
+
+    # ── Auto-hide hover behavior ────────────────────────────────────────────
+    def enterEvent(self, event) -> None:  # noqa: N802
+        self._leave_timer.stop()
+        self.expand()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802
+        if not self._menu_open:
+            self._leave_timer.start()
+        super().leaveEvent(event)
+
+    def expand(self) -> None:
+        self._leave_timer.stop()
+        if self._anim.state() == QPropertyAnimation.State.Running:
+            self._anim.stop()
+        if self._current_height != self.EXPANDED_HEIGHT:
+            self._anim.setStartValue(self._current_height)
+            self._anim.setEndValue(self.EXPANDED_HEIGHT)
+            self._anim.start()
+
+    def collapse(self) -> None:
+        if not self._menu_open:
+            self._leave_timer.start()
+
+    def _do_collapse(self) -> None:
+        if self._menu_open:
+            return
+        if self._anim.state() == QPropertyAnimation.State.Running:
+            self._anim.stop()
+        if self._current_height != self.COLLAPSED_HEIGHT:
+            self._anim.setStartValue(self._current_height)
+            self._anim.setEndValue(self.COLLAPSED_HEIGHT)
+            self._anim.start()
 
     # ── Construction helpers ────────────────────────────────────────────────
     def _window_button(self, icon_name: str, tooltip: str) -> QPushButton:
@@ -181,6 +246,25 @@ class FramelessWindow(QMainWindow):
         self._titlebar.minimize_requested.connect(self.showMinimized)
         self._titlebar.maximize_requested.connect(self.toggle_maximize)
         self._titlebar.close_requested.connect(self.close)
+
+        # Track mouse globally so hovering the very top edge reveals TitleBar
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self)
+
+    def eventFilter(self, watched, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.MouseMove and self.isVisible():
+            local_pos = self.mapFromGlobal(QCursor.pos())
+            if 0 <= local_pos.x() <= self.width():
+                if 0 <= local_pos.y() <= 14:
+                    self._titlebar.expand()
+                elif (
+                    local_pos.y() > theme.TITLEBAR_HEIGHT + 8
+                    and not self._titlebar.underMouse()
+                    and not self._titlebar.is_menu_open()
+                ):
+                    self._titlebar.collapse()
+        return False
 
     # ── Content ─────────────────────────────────────────────────────────────
     @property

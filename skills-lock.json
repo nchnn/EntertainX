@@ -1,6 +1,27 @@
 {
   "version": 2,
   "skills": {
+    "codebase-design": {
+      "source": "mattpocock/skills",
+      "commit": "6f7f7831a625f040a8e06a0e7954826b87ce775a",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/codebase-design/SKILL.md",
+      "computedHash": "d40f025dc1b0f2020663260f38f2bcb8d6ed3523afb11e5fda624b01238677e8"
+    },
+    "domain-modeling": {
+      "source": "mattpocock/skills",
+      "commit": "6f7f7831a625f040a8e06a0e7954826b87ce775a",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/domain-modeling/SKILL.md",
+      "computedHash": "7d4453f798d7785c945972abe0871493caf884fa3ee82725cc71e783de6176ea"
+    },
+    "grilling": {
+      "source": "mattpocock/skills",
+      "commit": "6f7f7831a625f040a8e06a0e7954826b87ce775a",
+      "sourceType": "github",
+      "skillPath": "skills/productivity/grilling/SKILL.md",
+      "computedHash": "485451958784497cd4c4dbea13cb5bbb579da58fac0d0e45f3bcb310fab68ac7"
+    },
     "impeccable": {
       "source": "pbakaus/impeccable",
       "sourceType": "github",
@@ -8,12 +29,27 @@
       "computedHash": "86e265bf3df79c65215f7244d71892ca278370d56dec47a8cc15e8373db3f714",
       "installMode": "copy"
     },
+    "improve-codebase-architecture": {
+      "source": "mattpocock/skills",
+      "commit": "6f7f7831a625f040a8e06a0e7954826b87ce775a",
+      "sourceType": "github",
+      "skillPath": "skills/engineering/improve-codebase-architecture/SKILL.md",
+      "computedHash": "f0820b18426a7d9a6c823a890988ba0ac70bf0fd596d30d7ef07c88558728c23"
+    },
     "reverse-api-engineer": {
       "source": "kalil0321/reverse-api-engineer",
       "commit": "a1c79a9b0eec6b63b34381370e7d8a8ab56ab3f8",
       "sourceType": "github",
       "skillPath": "skills/reverse-api-engineer/SKILL.md",
       "computedHash": "37d2215b77b9e66ffab6937d8d76289651825fd086428a84d336250d9242bc5a",
+      "installMode": "copy"
+    },
+    "untangle-codebase": {
+      "source": "caldoai/skills",
+      "commit": "d5b68dace378219890d821adb3685538e2c69b04",
+      "sourceType": "github",
+      "skillPath": "skills/untangle-codebase/SKILL.md",
+      "computedHash": "73791c30d4da2e001bc095732771966338b764e2e7b57bb30a81439cff85aef4",
       "installMode": "copy"
     }
   }

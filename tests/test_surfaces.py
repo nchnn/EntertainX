@@ -1,4 +1,4 @@
-from ui.components.surfaces import (
+from ui.components.layout import (
     Badge,
     Card,
     EmptyState,

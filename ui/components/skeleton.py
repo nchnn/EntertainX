@@ -5,12 +5,27 @@ from __future__ import annotations
 import math
 
 from PySide6.QtCore import QObject, QRectF, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QFontMetricsF,
+    QPainter,
+    QPainterPath,
+    QPen,
+)
 from PySide6.QtWidgets import QWidget
 
 from theme import theme_manager as theme
 from ui.components.artwork import rounded_path
 from ui.components.motion import motion_enabled
+
+RANK_FONT_FAMILIES = (
+    "Impact",
+    "Arial Black",
+    "Segoe UI Black",
+    "Haettenschweiler",
+    "sans-serif",
+)
 
 
 class PulseClock(QObject):
@@ -62,17 +77,21 @@ def pulse_color(phase: float) -> QColor:
 
 
 class SkeletonTile(QWidget):
-    """A tile-sized placeholder that pulses while a shelf loads."""
+    """A tile-sized placeholder with a circular spinner and optional rank numeral."""
 
     def __init__(
         self,
         width: int = theme.TILE_WIDTH,
         height: int = theme.TILE_HEIGHT,
         radius: float = theme.RADIUS_MD,
+        rank: int | None = None,
+        overlap: int = 0,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self._radius = radius
+        self.rank = rank
+        self.overlap = overlap
         self.setFixedSize(width, height)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
         pulse_clock().tick.connect(self._on_tick)
@@ -92,8 +111,75 @@ class SkeletonTile(QWidget):
     def paintEvent(self, event) -> None:  # noqa: N802
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.fillPath(
-            rounded_path(QRectF(self.rect()), self._radius),
-            pulse_color(pulse_clock().phase),
+        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
+
+        if self.rank is not None:
+            num_text = str(self.rank)
+            font = QFont()
+            font.setFamilies(list(RANK_FONT_FAMILIES))
+            font.setStyleHint(QFont.StyleHint.SansSerif)
+            font.setPixelSize(220 if self.rank < 10 else 200)
+            font.setWeight(QFont.Weight.Black)
+            metrics = QFontMetricsF(font)
+            num_w = metrics.horizontalAdvance(num_text)
+            num_x = max(6.0, float(self.overlap - num_w + 14))
+            num_y = float(self.height() - 12)
+
+            path = QPainterPath()
+            path.addText(num_x, num_y, font, num_text)
+
+            painter.setPen(
+                QPen(
+                    QColor(0, 0, 0, 180),
+                    6,
+                    Qt.PenStyle.SolidLine,
+                    Qt.PenCapStyle.RoundCap,
+                    Qt.PenJoinStyle.RoundJoin,
+                )
+            )
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawPath(path)
+
+            painter.setPen(
+                QPen(
+                    QColor("#6A717E"),
+                    3,
+                    Qt.PenStyle.SolidLine,
+                    Qt.PenCapStyle.RoundCap,
+                    Qt.PenJoinStyle.RoundJoin,
+                )
+            )
+            painter.drawPath(path)
+
+            card_rect = QRectF(float(self.overlap), 0.0, float(self.width() - self.overlap), float(self.height()))
+        else:
+            card_rect = QRectF(0.0, 0.0, float(self.width()), float(self.height()))
+
+        card_path = rounded_path(card_rect, self._radius)
+        painter.fillPath(card_path, QColor("#141519"))
+        painter.setPen(QPen(QColor(255, 255, 255, 14), 1))
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawPath(card_path)
+
+        cx = card_rect.left() + card_rect.width() / 2.0
+        cy = card_rect.top() + card_rect.height() / 2.0
+        r = 17.0
+        spinner_rect = QRectF(cx - r, cy - r, r * 2.0, r * 2.0)
+
+        painter.setPen(QPen(QColor(255, 255, 255, 16), 2.5))
+        painter.drawEllipse(spinner_rect)
+
+        phase = pulse_clock().phase
+        start_angle = int((-phase * 360.0) * 16.0)
+        span_angle = int(270.0 * 16.0)
+        painter.setPen(
+            QPen(
+                QColor(theme.PRIMARY),
+                2.8,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+            )
         )
+        painter.drawArc(spinner_rect, start_angle, span_angle)
+
         painter.end()

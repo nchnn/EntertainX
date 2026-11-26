@@ -1,0 +1,19 @@
+from __future__ import annotations
+
+from PySide6.QtWidgets import QWidget
+
+from api.images import ImageStore
+from api.movies import TmdbClient
+from ui.pages.browse import BrowsePage
+
+
+class TVShowsPage(BrowsePage):
+    """Trending, airing, and genre shelves of TV series (TMDB)."""
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        provider: TmdbClient | None = None,
+        store: ImageStore | None = None,
+    ) -> None:
+        super().__init__("tv", "TV Shows", provider=provider, store=store, parent=parent)

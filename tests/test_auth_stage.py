@@ -1,7 +1,7 @@
 from PySide6.QtCore import QPointF
 from PySide6.QtGui import QTransform
 
-from ui.components.auth_stage import (
+from ui.components.auth.stage import (
     WORD_TO_CARD,
     WORDS,
     AuthStage,

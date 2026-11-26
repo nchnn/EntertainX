@@ -24,10 +24,10 @@ def test_content_area_restores_last_subtab():
     from ui.content_area import ContentArea
     ca = ContentArea()
     ca.show_category("Video")
-    ca._switch_subtab(2)   # TV Shows (index 2)
+    ca._switch_subtab(1)   # TV Shows (index 1)
     ca.show_category("Music")
     ca.show_category("Video")
-    assert ca._last_tab.get("Video") == 2
+    assert ca._last_tab.get("Video") == 1
 
 
 def test_sidebar_marks_active_button():
@@ -39,18 +39,6 @@ def test_sidebar_marks_active_button():
     assert sb._buttons["Video"].property("active") == "false"
     assert sb._buttons["Music"].isChecked()
     assert not sb._buttons["Video"].isChecked()
-
-
-def test_sidebar_logout_calls_callback():
-    from ui.sidebar import Sidebar
-
-    logged_out = []
-    sb = Sidebar("testuser", lambda c: None, on_logout=lambda: logged_out.append(True))
-    assert sb.logout_button is not None
-    assert sb.logout_button.toolTip() == "Log out"
-    assert sb.logout_button.accessibleName() == "Log out"
-    sb.logout_button.click()
-    assert logged_out == [True]
 
 
 def test_sidebar_has_no_duplicate_branding():
@@ -67,28 +55,6 @@ def test_sidebar_has_no_duplicate_branding():
     assert brand_labels == []
     texts = [child.text() for child in sb.findChildren(QLabel)]
     assert "EntertainX" not in texts
-
-
-def test_sidebar_anchors_profile_and_logout_together():
-    from ui.sidebar import Sidebar
-
-    sb = Sidebar("testuser", lambda c: None, on_logout=lambda: None)
-    footer = sb.profile_section
-    assert footer.isAncestorOf(sb.username_label)
-    assert footer.isAncestorOf(sb.status_label)
-    assert footer.isAncestorOf(sb.logout_button)
-
-
-def test_sidebar_profile_elides_long_usernames():
-    from PySide6.QtWidgets import QSizePolicy
-
-    from ui.sidebar import Sidebar
-
-    long_name = "a-very-long-display-name-that-would-push-the-button"
-    sb = Sidebar(long_name, lambda c: None, on_logout=lambda: None)
-    assert sb.username_label.text() == long_name
-    policy = sb.username_label.sizePolicy().horizontalPolicy()
-    assert policy == QSizePolicy.Policy.Ignored
 
 
 def test_content_area_switches_pages_and_tabs():
@@ -138,7 +104,7 @@ def test_main_window_logout_reaches_callback():
         {"id": 1, "username": "chris", "email": "chris@example.com"},
         on_logout=lambda: calls.append(True),
     )
-    window._do_logout()
+    window.do_logout()
     assert auth.logged_out
     assert calls == [True]
 

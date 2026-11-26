@@ -15,9 +15,9 @@ from PySide6.QtWidgets import (
 )
 
 from theme import theme_manager as theme
-from ui.components.fields import IconLineEdit
-from ui.components.media_card import CardGrid, MediaCard
-from ui.components.surfaces import Badge, EmptyState, PageHeader
+from ui.components.form_fields import IconLineEdit
+from ui.components.video.media_card import CardGrid, MediaCard
+from ui.components.layout import Badge, EmptyState, PageHeader
 
 
 class PageShell(QWidget):

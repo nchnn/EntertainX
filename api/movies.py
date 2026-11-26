@@ -130,7 +130,8 @@ class MediaDetails:
         return f"{IMAGE_BASE}/{size}{path}" if path else ""
 
     def textless_backdrop_url(self, size: str = "w780") -> str:
-        path = self.textless_backdrop_path or self.item.backdrop_path
+        # Prefer English image over textless
+        path = self.english_backdrop_path or self.item.backdrop_path
         return f"{IMAGE_BASE}/{size}{path}" if path else ""
 
     def poster_url(self, size: str = "w500") -> str:
@@ -346,7 +347,6 @@ def parse_details(raw: dict, media_type: str, region: str = "US") -> MediaDetail
 
     imgs = raw.get("images", {})
     en_backdrop = pick_english_image(imgs.get("backdrops", []), item.backdrop_path)
-    textless_backdrop = pick_textless_image(imgs.get("backdrops", []), item.backdrop_path)
     en_poster = pick_english_image(imgs.get("posters", []), item.poster_path)
 
     from dataclasses import replace
@@ -365,7 +365,7 @@ def parse_details(raw: dict, media_type: str, region: str = "US") -> MediaDetail
         status=str(raw.get("status") or ""),
         logo_path=pick_logo(imgs),
         english_backdrop_path=en_backdrop,
-        textless_backdrop_path=textless_backdrop,
+        textless_backdrop_path=en_backdrop,
         english_poster_path=en_poster,
     )
 

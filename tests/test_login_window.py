@@ -254,7 +254,7 @@ def test_segment_indicator_follows_the_active_tab(auth_env, app):
 
 
 def test_stage_copy_follows_the_form_mode(auth_env, app):
-    from ui.components.auth_stage import LEADS
+    from ui.components.auth.stage import LEADS
 
     auth, prefs = auth_env
     window = _window(auth, prefs)

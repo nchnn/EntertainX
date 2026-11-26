@@ -1,4 +1,4 @@
-from ui.components.media_card import CardGrid, MediaCard
+from ui.components.video.media_card import CardGrid, MediaCard
 
 
 def test_media_card_exposes_text(app):

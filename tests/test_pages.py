@@ -1,21 +1,19 @@
 import pytest
 
-from ui.components.surfaces import EmptyState
+from ui.components.layout import EmptyState
 
 
 def test_every_page_builds_with_a_header(app):
-    from ui.pages.games_chess import ChessPage
-    from ui.pages.games_fireboy import FireboyPage
-    from ui.pages.games_browse import BrowseGamesPage
+    from ui.pages.chess import ChessPage
+    from ui.pages.fireboy import FireboyPage
+    from ui.pages.games import BrowseGamesPage
     from ui.pages.music import MusicPage
     from ui.pages.my_lists import MyListsPage
     from ui.pages.settings import SettingsPage
-    from ui.pages.video_movies import MoviesPage
-    from ui.pages.video_tvshows import TVShowsPage
-    from ui.pages.video_youtube import YouTubePage
+    from ui.pages.movies import MoviesPage
+    from ui.pages.tv_shows import TVShowsPage
 
     pages = [
-        YouTubePage(),
         MoviesPage(),
         TVShowsPage(),
         MusicPage(),
@@ -36,7 +34,7 @@ def test_movies_page_builds_and_has_no_key_state(app):
 
     os.environ.pop("TMDB_API_KEY", None)
     from api.movies import TmdbClient
-    from ui.pages.video_movies import MoviesPage
+    from ui.pages.movies import MoviesPage
 
     provider = TmdbClient(api_key="")  # no key
     page = MoviesPage(provider=provider)
@@ -50,7 +48,7 @@ def test_movies_page_builds_and_has_no_key_state(app):
 def test_movies_genre_combo_has_entries(app):
     """The genre filter should contain at least Drama and Action."""
     from api.movies import TmdbClient
-    from ui.pages.video_movies import MoviesPage
+    from ui.pages.movies import MoviesPage
 
     page = MoviesPage(provider=TmdbClient(api_key=""))
     genres = [page.genre_filter.itemText(i) for i in range(page.genre_filter.count())]
@@ -80,7 +78,7 @@ def test_settings_page_shows_signed_in_user(app):
 
 
 def test_settings_page_has_no_logout_button(app):
-    """Logging out belongs to the sidebar so there is only one such action."""
+    """Logging out belongs to the top navigation profile menu."""
     from PySide6.QtWidgets import QPushButton
 
     from ui.pages.settings import SettingsPage
@@ -93,7 +91,7 @@ def test_settings_page_has_no_logout_button(app):
     from PySide6.QtWidgets import QLabel
 
     texts = [child.text() for child in page.findChildren(QLabel)]
-    assert any("sidebar" in text.lower() for text in texts)
+    assert any("navigation" in text.lower() for text in texts)
 
 
 def test_settings_cards_are_exposed(app):
@@ -110,7 +108,7 @@ def test_card_grid_reflows_to_available_width(app):
     from PySide6.QtWidgets import QFrame, QScrollArea
 
     from theme import theme_manager as theme
-    from ui.components.media_card import CardGrid, MediaCard
+    from ui.components.video.media_card import CardGrid, MediaCard
 
     cards = [MediaCard("film", f"Title {i}", "Subtitle") for i in range(8)]
     grid = CardGrid(cards)
@@ -144,9 +142,9 @@ def test_card_grid_reflows_to_available_width(app):
 def test_game_pages_disable_play_until_implemented(app, page_name):
     from PySide6.QtWidgets import QPushButton
 
-    from ui.pages import games_chess, games_fireboy
+    from ui.pages import chess, fireboy
 
-    page = getattr(games_chess, page_name, None) or getattr(games_fireboy, page_name)
+    page = getattr(chess, page_name, None) or getattr(fireboy, page_name)
     instance = page()
     play_buttons = [
         button

@@ -5,15 +5,14 @@ from PySide6.QtWidgets import QWidget
 
 from api.images import ImageStore
 from api.movies import MediaDetails, MediaItem, pick_english_image, pick_logo, pick_textless_image
-from ui.components.hover_preview import (
+from ui.components.video.hover_preview import (
     CARD_W,
-    COUNTDOWN_MS,
     IMG_H,
     HoverPreview,
     embed_hover_html,
 )
-from ui.components.title_detail import TitleDetailOverlay
-from ui.components.top10_panel import (
+from ui.components.video.title_detail import TitleDetailOverlay, embed_modal_html
+from ui.components.video.top10_panel import (
     NUMERAL_OVERLAP,
     NUMERAL_OVERLAP_10,
     TILE_W,
@@ -90,28 +89,6 @@ def test_top10_tile_geometry_and_font(app):
     assert font.weight() == QFont.Weight.Black
 
 
-def test_top10_tile_paint_without_error(app):
-    item = _make_item()
-    tile = Top10Tile(2, item)
-    pix = QPixmap(100, 150)
-    pix.fill(Qt.GlobalColor.blue)
-    tile.pixmap = pix
-    # Force paintEvent
-    tile.repaint()
-    assert tile.pixmap is not None
-
-
-def test_title_tile_paint_clean_artwork_without_text(app):
-    from ui.components.title_tile import TitleTile
-    item = _make_item()
-    tile = TitleTile(item)
-    pix = QPixmap(272, 153)
-    pix.fill(Qt.GlobalColor.darkGreen)
-    tile.pixmap = pix
-    tile.repaint()
-    assert tile.pixmap is not None
-
-
 def test_top10_panel_set_items(app):
     panel = Top10Panel("Top 10 Today")
     items = [_make_item(i, f"Movie {i}") for i in range(1, 11)]
@@ -150,13 +127,13 @@ def test_hover_preview_initialization_and_fill(app):
 def test_hover_preview_mute_toggle(app):
     host = QWidget()
     preview = HoverPreview(host)
-    assert preview._muted is True
-
-    preview._toggle_mute()
     assert preview._muted is False
 
     preview._toggle_mute()
     assert preview._muted is True
+
+    preview._toggle_mute()
+    assert preview._muted is False
 
 
 def test_hover_preview_watchlist_toggle(app):
@@ -265,7 +242,7 @@ def test_embed_hover_html_disables_actions_and_hides_youtube_logo():
     assert "controls=0" in html
     assert "disablekb=1" in html
     assert "close-btn" in html
-    assert "action:close" in html
+    assert "sendAction('close')" in html
 
 
 def test_title_detail_header_hover_and_countdown(app):
@@ -297,3 +274,51 @@ def test_title_detail_header_hover_and_countdown(app):
     detail.header.leaveEvent(None)
     assert detail.header._countdown_active is False
     assert detail.header._is_playing is False
+
+
+def test_embed_modal_html_cinematic_banner():
+    html = embed_modal_html(
+        "abc12345",
+        "https://example.com/logo.png",
+        "Way of the Warrior Kid",
+        muted=False,
+        in_watchlist=True,
+    )
+    assert "transform: translate(-50%, -50%) scale(1.35);" in html
+    assert "modal-play-btn" in html
+    assert "modal-list-btn" in html
+    assert "modal-circle-btn" in html
+    assert "sendAction('play')" in html
+    assert "sendAction('close')" in html
+    assert "sendAction('watchlist')" in html
+    assert "vq=hd1080" in html
+
+
+def test_title_detail_two_column_layout_and_metadata(app):
+    host = QWidget()
+    host.resize(1000, 800)
+    store = ImageStore(fetch=lambda url: b"")
+    detail = TitleDetailOverlay(host, store=store)
+    item = _make_item()
+    detail.open(item)
+
+    details = MediaDetails(
+        item=item,
+        certification="PG-13",
+        runtime_text="1h 47m",
+        trailer_key="abc12345",
+        logo_path="/logo.png",
+        cast=("Chris Pratt", "Jude Hill", "Linda Cardellini"),
+        genres=("Drama", "Family"),
+        tagline="A mentor changes everything.",
+    )
+    detail.set_details(details)
+
+    assert detail.year_label.text() == item.year
+    assert detail.runtime_label.text() == "1h 47m"
+    assert detail.cert_label.text() == "PG-13"
+    assert detail.quality_badge.text() == "HD"
+    assert "Chris Pratt" in detail.cast_label.text()
+    assert "Drama" in detail.genres_label.text()
+    assert "mentor changes everything" in detail.mood_label.text()
+

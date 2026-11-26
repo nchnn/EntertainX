@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 
 from theme import theme_manager as theme
 from ui.components.icons import make_icon
-from ui.components.surfaces import Badge, Card, Divider, label
+from ui.components.layout import Badge, Card, Divider, label
 from ui.pages.page_shell import PageShell
 
 

@@ -57,6 +57,17 @@ _SLUGS = {
     "shield": "shield",
     "volume-2": "volume-2",
     "volume-x": "volume-x",
+    "thumbs-up": "thumbs-up",
+    "chevron-down": "chevron-down",
+    "refresh": "refresh-cw",
+    "palette": "palette",
+    "skip-back": "skip-back",
+    "skip-forward": "skip-forward",
+    "shuffle": "shuffle",
+    "repeat": "repeat",
+    "heart": "heart",
+    "mic": "mic-2",
+    "queue": "list-music",
 }
 
 

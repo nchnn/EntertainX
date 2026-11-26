@@ -5,6 +5,7 @@ description = "Multi-category entertainment desktop app built with PySide6"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "pycryptodome>=4.6.0",
     "PySide6==6.12.0",
     "PySide6_Addons==6.12.0",
     "PySide6_Essentials==6.12.0",

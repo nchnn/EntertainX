@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget
 
-from ui.components.surfaces import EmptyState
+from ui.components.layout import EmptyState
 from ui.pages.page_shell import PageShell
 
 

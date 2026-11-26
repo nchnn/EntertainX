@@ -16,7 +16,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QApplication, QWidget
 
 # ── Surfaces ────────────────────────────────────────────────────────────────
-BG = "#1c1b1c"
+BG = "#242326"
 BG_SIDEBAR = "#303034"
 BG_CARD = "#3B393F"
 BG_ELEVATED = "#454249"
@@ -470,6 +470,24 @@ QPushButton[variant="hero"]:focus {
     border: 1px solid %(text)s;
 }
 
+QPushButton[variant="modalPlay"] {
+    background-color: #FFFFFF;
+    color: #000000;
+    border: none;
+    border-radius: %(radius_sm)spx;
+    font-size: %(size_md)spx;
+    font-weight: 700;
+    padding: 0 28px;
+    min-height: 44px;
+    max-height: 44px;
+}
+QPushButton[variant="modalPlay"]:hover {
+    background-color: rgba(255, 255, 255, 0.85);
+}
+QPushButton[variant="modalPlay"]:pressed {
+    background-color: rgba(255, 255, 255, 0.70);
+}
+
 QPushButton[variant="playDisc"] {
     background-color: %(accent)s;
     border: 1px solid %(accent_pressed)s;
@@ -572,6 +590,34 @@ QPushButton[variant="nav"][active="true"] {
     background-color: %(accent_soft_strong)s;
     color: %(accent)s;
     font-weight: 600;
+}
+QPushButton[variant="nav-icon"] {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: %(radius_md)spx;
+    color: %(text_muted)s;
+    padding: 0px;
+}
+QPushButton[variant="nav-icon"]:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+QPushButton[variant="nav-icon"][active="true"] {
+    background-color: %(accent_soft_strong)s;
+    border-color: %(accent)s;
+}
+QPushButton[variant="user-avatar"] {
+    background-color: %(accent)s;
+    color: %(on_accent)s;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 14px;
+    font-weight: 700;
+    font-size: %(size_sm)spx;
+    padding: 0px;
+}
+QPushButton[variant="user-avatar"]:hover {
+    background-color: %(accent_hover)s;
+    border-color: %(accent)s;
 }
 
 QPushButton[variant="tab"] {
@@ -880,20 +926,20 @@ QPushButton[variant="glass"]:focus {
     border: 1px solid %(text)s;
 }
 QPushButton[variant="ring"] {
-    background-color: rgba(36, 35, 38, 0.72);
-    border: 2px solid rgba(255, 255, 255, 0.45);
-    border-radius: 19px;
+    background-color: rgba(30, 31, 38, 0.70);
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    border-radius: 22px;
     padding: 0px;
 }
 QPushButton[variant="ring"]:hover {
-    border-color: %(text)s;
-    background-color: rgba(255, 255, 255, 0.16);
+    border-color: #FFFFFF;
+    background-color: rgba(45, 47, 56, 0.90);
 }
 QPushButton[variant="ring"]:pressed {
     background-color: rgba(255, 255, 255, 0.08);
 }
 QPushButton[variant="ring"]:focus {
-    border-color: %(accent)s;
+    border-color: #FFFFFF;
 }
 QPushButton[variant="rowArrow"] {
     background-color: rgba(20, 19, 21, 0.78);

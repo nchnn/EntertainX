@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from auth.auth_manager import AuthManager
-from ui.components.surfaces import InlineBanner
+from ui.components.layout import InlineBanner
 from ui.pages.page_shell import PageShell
 
 

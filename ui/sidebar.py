@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import (
+    QEasingCurve,
+    QEvent,
+    QPropertyAnimation,
+    QSize,
+    Qt,
+    Property,
+    QTimer,
+)
+from PySide6.QtGui import QEnterEvent
 from PySide6.QtWidgets import (
     QButtonGroup,
     QHBoxLayout,
@@ -15,41 +24,50 @@ from PySide6.QtWidgets import (
 
 from theme import theme_manager as theme
 from ui.components.icons import make_icon
-from ui.components.surfaces import Divider, ElidedLabel, label
 
-_BASE_CATEGORIES = ["Video", "Music", "Games", "My Lists", "Settings"]
-CATEGORIES = _BASE_CATEGORIES  # kept for backward compatibility
-
+_CATEGORIES = ["Video", "Music", "Games"]
 _ICONS = {
     "Video": "film",
     "Music": "music",
     "Games": "gamepad",
-    "My Lists": "list",
-    "Settings": "gear",
     "Admin": "shield",
+}
+_TOOLTIPS = {
+    "Video": "<b>Film</b><br><span style='color:#B8B2B5;'>Movies, TV Shows & Trailers</span>",
+    "Music": "<b>Music</b><br><span style='color:#B8B2B5;'>Songs, Albums & Playlists</span>",
+    "Games": "<b>Games</b><br><span style='color:#B8B2B5;'>Playable In-GUI Games & Catalog</span>",
+    "Admin": "<b>Admin</b><br><span style='color:#B8B2B5;'>User & System Administration</span>",
 }
 
 
 class Sidebar(QWidget):
-    """Navigation rail: categories in the middle, account + log out at the bottom.
+    """Icon-only navigation rail with auto-hide overflow behavior.
 
-    Branding lives only in the window title bar, so the rail starts directly
-    with navigation and ends with a single, anchored profile row.
+    Collapses to a narrow 6px indicator at the left edge; expands smoothly
+    on hover to reveal the Film, Music, and Games icon controls.
     """
+
+    COLLAPSED_WIDTH = 0
+    EXPANDED_WIDTH = 64
 
     def __init__(
         self,
-        username: str,
-        on_category: Callable[[str], None],
+        username: str | Callable[[str], None] = "",
+        on_category: Callable[[str], None] | None = None,
         on_logout: Callable[[], None] | None = None,
         is_admin: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("Sidebar")
-        self.setFixedWidth(theme.SIDEBAR_WIDTH)
+        self.setMouseTracking(True)
 
-        self._on_category = on_category
+        # Support both Sidebar(on_category) and Sidebar(username, on_category, ...)
+        if callable(username) and on_category is None:
+            on_category = username
+            username = ""
+
+        self._on_category = on_category or (lambda _c: None)
         self._on_logout = on_logout
         self._active = ""
         self._buttons: dict[str, QPushButton] = {}
@@ -57,95 +75,90 @@ class Sidebar(QWidget):
         self._group.setExclusive(True)
         self.logout_button: QPushButton | None = None
 
-        # Build category list: admins get the Admin item appended.
-        categories = list(_BASE_CATEGORIES)
+        self._current_width = self.COLLAPSED_WIDTH
+        self.setFixedWidth(self.COLLAPSED_WIDTH)
+
+        self._anim = QPropertyAnimation(self, b"rail_width")
+        self._anim.setDuration(220)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+        self._leave_timer = QTimer(self)
+        self._leave_timer.setSingleShot(True)
+        self._leave_timer.setInterval(120)
+        self._leave_timer.timeout.connect(self._do_collapse)
+
+        categories = list(_CATEGORIES)
         if is_admin:
             categories.append("Admin")
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
+        layout.setContentsMargins(8, theme.SPACE_XL, 8, theme.SPACE_MD)
+        layout.setSpacing(theme.SPACE_MD)
+        layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
 
-        nav = QVBoxLayout()
-        nav.setContentsMargins(
-            theme.SPACE_MD, theme.SPACE_XL, theme.SPACE_MD, theme.SPACE_MD
-        )
-        nav.setSpacing(theme.SPACE_XS)
         for category in categories:
-            button = self._build_nav_button(category)
-            self._group.addButton(button)
-            self._buttons[category] = button
-            nav.addWidget(button)
-        layout.addLayout(nav)
+            btn = self._build_icon_button(category)
+            self._group.addButton(btn)
+            self._buttons[category] = btn
+            layout.addWidget(btn)
 
         layout.addStretch(1)
-        layout.addWidget(Divider())
 
-        self.profile_section = self._build_profile(username)
-        layout.addWidget(self.profile_section)
+        self.set_active(_CATEGORIES[0])
 
-        self.set_active(CATEGORIES[0])
+    # ── Property for smooth width animation ─────────────────────────────────
+    def _get_rail_width(self) -> int:
+        return self._current_width
+
+    def _set_rail_width(self, width: int) -> None:
+        self._current_width = width
+        self.setFixedWidth(width)
+
+    rail_width = Property(int, _get_rail_width, _set_rail_width)
 
     # ── Construction ────────────────────────────────────────────────────────
-    def _build_nav_button(self, category: str) -> QPushButton:
-        button = QPushButton(category)
-        button.setProperty("variant", "nav")
+    def _build_icon_button(self, category: str) -> QPushButton:
+        button = QPushButton()
+        button.setProperty("variant", "nav-icon")
         button.setCheckable(True)
         button.setIcon(
-            make_icon(_ICONS[category], theme.TEXT_MUTED, 18, theme.PRIMARY)
+            make_icon(_ICONS[category], theme.TEXT_MUTED, 22, theme.PRIMARY)
         )
-        button.setIconSize(QSize(18, 18))
-        button.setFixedHeight(42)
+        button.setIconSize(QSize(22, 22))
+        button.setFixedSize(46, 46)
         button.setCursor(Qt.CursorShape.PointingHandCursor)
+        button.setToolTip(_TOOLTIPS.get(category, category))
         button.clicked.connect(lambda checked=False, c=category: self.set_active(c))
         return button
 
-    def _build_profile(self, username: str) -> QWidget:
-        footer = QWidget()
-        row = QHBoxLayout(footer)
-        row.setContentsMargins(
-            theme.SPACE_MD, theme.SPACE_MD, theme.SPACE_MD, theme.SPACE_LG
-        )
-        row.setSpacing(theme.SPACE_SM)
+    # ── Auto-hide hover behavior ────────────────────────────────────────────
+    def enterEvent(self, event: QEnterEvent) -> None:
+        self._leave_timer.stop()
+        self.expand()
+        super().enterEvent(event)
 
-        initial = (username.strip() or "?")[0].upper()
-        self.avatar_label = QLabel(initial)
-        self.avatar_label.setProperty("role", "avatar")
-        self.avatar_label.setFixedSize(30, 30)
-        self.avatar_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        row.addWidget(self.avatar_label, 0, Qt.AlignmentFlag.AlignVCenter)
+    def leaveEvent(self, event: QEvent) -> None:
+        self._leave_timer.start()
+        super().leaveEvent(event)
 
-        account = QVBoxLayout()
-        account.setContentsMargins(0, 0, 0, 0)
-        account.setSpacing(1)
+    def expand(self) -> None:
+        if self._anim.state() == QPropertyAnimation.State.Running:
+            self._anim.stop()
+        if self._current_width != self.EXPANDED_WIDTH:
+            self._anim.setStartValue(self._current_width)
+            self._anim.setEndValue(self.EXPANDED_WIDTH)
+            self._anim.start()
 
-        self.username_label = ElidedLabel(username)
-        self.username_label.setProperty("role", "username")
-        self.username_label.setToolTip(username)
-        self.username_label.setMinimumWidth(0)
-        self.username_label.setSizePolicy(
-            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
-        )
-        account.addWidget(self.username_label)
+    def collapse(self) -> None:
+        self._leave_timer.start()
 
-        self.status_label = label("Signed in", "caption", wrap=False)
-        account.addWidget(self.status_label)
-
-        row.addLayout(account, 1)
-
-        if self._on_logout is not None:
-            self.logout_button = QPushButton()
-            self.logout_button.setProperty("variant", "icon")
-            self.logout_button.setIcon(make_icon("logout", theme.PRIMARY, 18))
-            self.logout_button.setIconSize(QSize(18, 18))
-            self.logout_button.setFixedSize(36, 36)
-            self.logout_button.setToolTip("Log out")
-            self.logout_button.setAccessibleName("Log out")
-            self.logout_button.setCursor(Qt.CursorShape.PointingHandCursor)
-            self.logout_button.clicked.connect(self._handle_logout)
-            row.addWidget(self.logout_button, 0, Qt.AlignmentFlag.AlignVCenter)
-
-        return footer
+    def _do_collapse(self) -> None:
+        if self._anim.state() == QPropertyAnimation.State.Running:
+            self._anim.stop()
+        if self._current_width != self.COLLAPSED_WIDTH:
+            self._anim.setStartValue(self._current_width)
+            self._anim.setEndValue(self.COLLAPSED_WIDTH)
+            self._anim.start()
 
     # ── Navigation ──────────────────────────────────────────────────────────
     def active_category(self) -> str:
@@ -161,8 +174,3 @@ class Sidebar(QWidget):
             button.setProperty("active", "true" if active else "false")
             theme.restyle(button)
         self._on_category(name)
-
-    # ── Session ─────────────────────────────────────────────────────────────
-    def _handle_logout(self) -> None:
-        if self._on_logout is not None:
-            self._on_logout()

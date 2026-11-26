@@ -18,21 +18,21 @@ from auth.background import run_in_background
 from auth.preferences import LoginPreferences
 from theme import theme_manager as theme
 from ui.components import motion
-from ui.components.auth_controls import (
+from ui.components.auth.controls import (
     AnimatedCheckBox,
     LoadingButton,
     SegmentSwitch,
     letter_spaced,
 )
-from ui.components.auth_stage import AuthStage
-from ui.components.fields import (
+from ui.components.auth.stage import AuthStage
+from ui.components.form_fields import (
     FormField,
     IconLineEdit,
     PasswordLineEdit,
     PasswordStrength,
 )
 from ui.components.icons import make_icon
-from ui.components.surfaces import InlineBanner, label
+from ui.components.layout import InlineBanner, label
 
 FORM_WIDTH = 408
 MOTION_PAD = 28  # room beside and below the form so sliding content is not clipped

@@ -96,10 +96,10 @@
 - [ ] Star ratings saved to SQLite
 - [ ] Add to personal lists
 
-#### ⬜ 4. Music
-- [ ] Artist/album/track search
-- [ ] Album art, metadata, durations
-- [ ] 30-second audio preview playback
+#### ⏳ 4. Music
+- [x] Artist/album/track search
+- [x] Album art, metadata, durations
+- [x] High-bitrate audio streaming playback (320kbps & previews)
 - [ ] Star ratings saved to SQLite
 - [ ] Add to playlists/favorites
 

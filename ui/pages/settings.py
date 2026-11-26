@@ -8,8 +8,8 @@ from PySide6.QtWidgets import (
 )
 
 from theme import theme_manager as theme
-from ui.components.fields import LabeledValue
-from ui.components.surfaces import Card, Divider, SectionLabel, label
+from ui.components.form_fields import LabeledValue
+from ui.components.layout import Card, Divider, SectionLabel, label
 from ui.pages.page_shell import PageShell
 
 _SWATCHES = [
@@ -25,7 +25,7 @@ _SWATCHES = [
 class SettingsPage(PageShell):
     """Profile, appearance preview, and session information.
 
-    Logging out is handled exclusively by the sidebar footer so there is only
+    Logging out is handled via the top navigation profile menu so there is only
     one logout action in the application.
     """
 
@@ -105,7 +105,7 @@ class SettingsPage(PageShell):
         card.body.addWidget(
             label(
                 "This session stays active until you log out. Use the log out "
-                "button beside your profile at the bottom of the sidebar.",
+                "button in the profile menu at the top navigation bar.",
                 "muted",
             )
         )

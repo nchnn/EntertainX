@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QLineEdit
 
-from ui.components.fields import (
+from ui.components.form_fields import (
     FormField,
     IconLineEdit,
     PasswordLineEdit,

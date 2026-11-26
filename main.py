@@ -79,8 +79,13 @@ class MainApp(FramelessWindow):
     def _on_login_success(self, user: dict) -> None:
         from ui.main_window import MainWindow
 
-        self.set_content(
-            MainWindow(self._auth, user, on_logout=self._return_to_login)
+        main_window = MainWindow(self._auth, user, on_logout=self._return_to_login)
+        self.set_content(main_window)
+        main_window.content.top_bar.set_user_session(
+            user=user,
+            on_theme=main_window.open_theme_dialog,
+            on_settings=lambda: main_window.content.show_category("Settings"),
+            on_logout=main_window.do_logout,
         )
 
     def _return_to_login(self) -> None:
