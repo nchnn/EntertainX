@@ -163,8 +163,8 @@ QWidget#Sidebar {
     border-right: 1px solid %(border)s;
 }
 QWidget#TabBar {
-    background-color: %(bg)s;
-    border-bottom: 1px solid %(border)s;
+    background: transparent;
+    border: none;
 }
 QWidget#AuthBackdrop {
     background-color: %(bg)s;

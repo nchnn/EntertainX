@@ -6,7 +6,6 @@ from ui.components.layout import EmptyState
 def test_every_page_builds_with_a_header(app):
     from ui.pages.chess import ChessPage
     from ui.pages.fireboy import FireboyPage
-    from ui.pages.games import BrowseGamesPage
     from ui.pages.music import MusicPage
     from ui.pages.my_lists import MyListsPage
     from ui.pages.settings import SettingsPage
@@ -19,13 +18,128 @@ def test_every_page_builds_with_a_header(app):
         MusicPage(),
         ChessPage(),
         FireboyPage(),
-        BrowseGamesPage(),
         MyListsPage(),
         SettingsPage(),
     ]
     for page in pages:
         assert page.title
         assert page.title == page.header.title
+
+
+def test_games_page_hosts_catalog_and_player(app):
+    from ui.pages.games import GamesPage
+    from ui.pages.games.catalog import CatalogPage
+    from ui.pages.games.player import GamePlayerWidget
+
+    page = GamesPage()
+    assert page.count() == 2
+    assert isinstance(page.widget(0), CatalogPage)
+    assert isinstance(page.widget(1), GamePlayerWidget)
+    assert page.currentIndex() == 0
+
+
+def test_games_catalog_renders_a_card_per_entry(app, monkeypatch):
+    import ui.pages.games.catalog as catalog_mod
+    from api.games import GameEntry
+
+    # Keep the test offline: the real fetch runs on a worker thread.
+    monkeypatch.setattr(catalog_mod, "run_async", lambda *args, **kwargs: None)
+
+    entries = [
+        GameEntry(
+            name=f"Game {i}",
+            directory=f"game-{i}",
+            image="cover.png",
+            tags=["action"],
+            thumbnail_url=f"https://example.test/game-{i}/cover.png",
+            backup_thumbnail_url="",
+            embed_url=f"https://example.test/game-{i}/index.html",
+        )
+        for i in range(3)
+    ]
+
+    page = catalog_mod.CatalogPage()
+    page._on_catalog_loaded(entries)
+
+    assert len(page._grid.cards) == 3
+    assert [card.entry.name for card in page._grid.visible_cards()] == [
+        "Game 0",
+        "Game 1",
+        "Game 2",
+    ]
+    assert page._count_lbl.text() == "3 games available"
+    assert page._genre_combo.itemText(1) == "Action"
+
+
+def test_games_catalog_only_loads_visible_thumbnails(app, monkeypatch, wait_for):
+    import ui.pages.games.catalog as catalog_mod
+    import ui.pages.games.game_card as card_mod
+    from api.games import GameEntry
+
+    monkeypatch.setattr(catalog_mod, "run_async", lambda *args, **kwargs: None)
+
+    class RecordingStore:
+        def __init__(self) -> None:
+            self.urls: list[str] = []
+
+        def request(self, url, width, callback, owner=None) -> None:
+            self.urls.append(url)
+
+    store = RecordingStore()
+    monkeypatch.setattr(card_mod, "get_store", lambda: store)
+
+    entries = [
+        GameEntry(
+            name=f"Game {i}",
+            directory=f"game-{i}",
+            image="cover.png",
+            tags=["action"],
+            thumbnail_url=f"https://example.test/game-{i}/cover.png",
+            backup_thumbnail_url="",
+            embed_url=f"https://example.test/game-{i}/index.html",
+        )
+        for i in range(120)
+    ]
+
+    page = catalog_mod.CatalogPage()
+    page.resize(1200, 800)
+    page.show()
+    app.processEvents()
+    page._on_catalog_loaded(entries)
+
+    assert wait_for(lambda: not page._pending_entries, timeout=5)
+    assert wait_for(lambda: bool(store.urls), timeout=2)
+
+    # The limiter must never request every cover at once.
+    assert 0 < len(store.urls) < len(entries)
+
+
+def test_games_page_opens_the_player_for_a_selected_game(app, monkeypatch):
+    import ui.pages.games.catalog as catalog_mod
+    from api.games import GameEntry
+    from ui.pages.games import GamesPage
+
+    monkeypatch.setattr(catalog_mod, "run_async", lambda *args, **kwargs: None)
+
+    entry = GameEntry(
+        name="2048",
+        directory="2048",
+        image="cover.png",
+        tags=["puzzle"],
+        thumbnail_url="https://example.test/2048/cover.png",
+        backup_thumbnail_url="",
+        embed_url="https://example.test/2048/index.html",
+    )
+
+    page = GamesPage()
+    page._open_game(entry)
+
+    assert page.currentIndex() == 1
+    assert page._player._title_label.text() == "2048"
+    assert page._player._web_view.url().toString() == entry.embed_url
+
+    page._close_game()
+    assert page.currentIndex() == 0
 
 
 def test_movies_page_builds_and_has_no_key_state(app):

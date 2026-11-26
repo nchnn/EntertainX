@@ -164,13 +164,17 @@ class Sidebar(QWidget):
     def active_category(self) -> str:
         return self._active
 
-    def set_active(self, name: str) -> None:
-        if name not in self._buttons:
-            return
-        self._active = name
+    def mark_active(self, name: str) -> None:
+        """Update the rail highlight without navigating again."""
+        self._active = name if name in self._buttons else ""
         for category, button in self._buttons.items():
             active = category == name
             button.setChecked(active)
             button.setProperty("active", "true" if active else "false")
             theme.restyle(button)
+
+    def set_active(self, name: str) -> None:
+        if name not in self._buttons:
+            return
+        self.mark_active(name)
         self._on_category(name)

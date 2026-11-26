@@ -1,7 +1,7 @@
 import sys
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QComboBox, QScrollArea
+from PySide6.QtWidgets import QApplication, QComboBox, QLabel, QPushButton, QScrollArea
 
 from ui.components.form_fields import IconLineEdit
 from ui.content_area import ContentArea, TopNavBar
@@ -21,9 +21,12 @@ def test_top_nav_three_sections_exist():
     top_bar = ca.top_bar
     assert isinstance(top_bar, TopNavBar)
 
-    # Left section: search stack exists and is visible for Video
-    assert not top_bar._left_container.isHidden()
+    # Category switch lives on the sidebar, not a Film / Music / Games pill
+    assert not hasattr(ca, "_category_toggle")
+    assert all(button.text() not in {"Film", "Music", "Games"} for button in top_bar.findChildren(QPushButton))
+    assert all("Reel" not in label.text() for label in top_bar.findChildren(QLabel))
     assert top_bar.search_stack.count() >= 2
+    assert top_bar.search_stack.parent() is top_bar._right_container
 
     # Center section: Movies and TV Shows
     assert len(ca._tab_buttons) == 2
@@ -105,6 +108,25 @@ def test_top_nav_navigation_movies_tv_saved():
     assert ca._tab_buttons[0].property("active") == "true"
     assert ca._tab_buttons[1].property("active") == "false"
     assert top_bar.saved_button.property("active") == "false"
+
+
+def test_top_nav_film_music_games_switch_pages():
+    ca = ContentArea(user={"username": "alice"})
+    top_bar = ca.top_bar
+
+    ca.show_category("Music")
+    assert ca.current_page().__class__.__name__ == "MusicPage"
+    assert not top_bar.search_stack.isVisible()
+
+    ca.show_category("Games")
+    assert ca.current_page().__class__.__name__ == "GamesPage"
+    assert ca._segmented_toggle is None  # single-tab category: no toggle
+
+    ca.show_category("Video")
+    assert ca.current_page().__class__.__name__ == "MoviesPage"
+    assert not top_bar.search_stack.isHidden()
+    assert top_bar.search_stack.currentIndex() == 0
+    assert ca._tab_buttons[0].text() == "Movies"
 
 
 def test_top_nav_fixed_outside_scroll_area():

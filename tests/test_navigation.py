@@ -66,10 +66,13 @@ def test_content_area_switches_pages_and_tabs():
     assert ca._tab_bar.isVisibleTo(ca)  # the sub-tab strip keeps a stable height
 
     ca.show_category("Games")
-    ca._switch_subtab(2)
-    assert ca.current_page().__class__.__name__ == "BrowseGamesPage"
-    assert ca.current_tab_index() == 2
-    assert ca._tab_buttons[2].property("active") == "true"
+    assert ca.current_page().__class__.__name__ == "GamesPage"
+
+    ca.show_category("Video")
+    ca._switch_subtab(1)
+    assert ca.current_page().__class__.__name__ == "TVShowsPage"
+    assert ca.current_tab_index() == 1
+    assert ca._tab_buttons[1].property("active") == "true"
 
 
 def test_content_area_passes_user_to_settings():

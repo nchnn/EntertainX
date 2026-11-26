@@ -21,8 +21,8 @@ from theme import theme_manager as theme
 BASE_URL = "https://entertainx.local/"
 COUNTDOWN_MS = 600
 COUNTDOWN_STEP_MS = 30
-REVEAL_DELAY_MS = 3500 
-AUDIO_FADE_MS = 2500
+REVEAL_DELAY_MS = 4000 
+AUDIO_FADE_MS = 3000
 TARGET_VOLUME = 100
 
 PlayerMode = Literal["hover", "modal", "simple"]

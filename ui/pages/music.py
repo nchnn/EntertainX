@@ -111,7 +111,7 @@ class MusicPage(PageShell):
     ) -> None:
         super().__init__(
             "Music",
-            "Stream millions of songs with 320kbps audio and synced lyrics.",
+            "Stream millions of full-length songs in 320kbps high quality with synced lyrics.",
             parent=parent,
         )
         self.client = client or MusicClient()

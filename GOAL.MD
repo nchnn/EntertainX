@@ -32,7 +32,7 @@
 1. **Single unified window** — sidebar nav + stacked content viewport
 2. **Secure auth** — registration, login, logout; PBKDF2 hashing; no plain-text passwords
 3. **Movies & TV** — zero-cost API, search, trending, detail view, star ratings, list actions
-4. **Music** — zero-cost API, search, metadata, 30-sec audio previews, ratings, playlists
+4. **Music** — zero-cost API, search, metadata, audio previews, ratings, playlists
 5. **Games Catalog** — zero-cost API, browse, metadata, screenshots, ratings
 6. **Playable In-GUI Game** — interactive game inside the app window (QWebEngineView or native Qt); no external browser; session tracking in `game_sessions` table
 7. **Personal Lists** — Favorites / Watchlist / Completed across all categories; SQLite-backed
@@ -103,16 +103,16 @@
 - [ ] Star ratings saved to SQLite
 - [ ] Add to playlists/favorites
 
-#### ⬜ 5. Games Catalog
-- [ ] Genre/platform search and discovery
+#### 🟡 5. Games Catalog
+- [x] Genre/platform search and discovery
 - [ ] Cover art, publisher, system requirements
 - [ ] Star ratings and Want-to-Play lists
 - [ ] Screenshot carousel
 
-#### ⬜ 6. Playable In-GUI Game
-- [ ] Interactive game inside the app window
+#### 🟡 6. Playable In-GUI Game
+- [x] Interactive game inside the app window
 - [ ] API-supported session flow
-- [ ] No external browser — contained in Qt
+- [x] No external browser — contained in Qt
 - [ ] Keyboard/mouse controls, real-time feedback
 - [ ] Start, play, pause, game-over, restart
 

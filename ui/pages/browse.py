@@ -7,7 +7,8 @@ network. Shelves load lazily as they near the viewport.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, Qt, QTimer
+from PySide6.QtCore import QPoint, QRect, Qt, QTimer
+from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -45,6 +46,68 @@ LOOKAHEAD = 360  # px below the viewport at which a shelf starts loading
 SEARCH_DEBOUNCE_MS = 350
 ATTRIBUTION = "This product uses the TMDB API but is not endorsed or certified by TMDB."
 
+_GENRE_PILL_QSS = """
+QComboBox {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #F4F1F2;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+    padding: 0px 28px 0px 14px;
+    font-size: 13px;
+    font-family: 'Figtree', 'Segoe UI', sans-serif;
+}
+QComboBox:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+QComboBox:focus {
+    border-color: #E8AAB9;
+}
+QComboBox::drop-down {
+    border: none;
+    width: 22px;
+}
+QComboBox::down-arrow {
+    image: none;
+    width: 0px;
+    height: 0px;
+}
+QComboBox QAbstractItemView {
+    background-color: #2A272C;
+    color: #F4F1F2;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    selection-background-color: rgba(232, 170, 185, 0.28);
+    selection-color: #F4F1F2;
+    outline: none;
+    padding: 4px;
+}
+"""
+
+
+class NavGenreCombo(QComboBox):
+    """Genre filter drawn as a nav pill with a chevron."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        from ui.components.icons import make_icon
+
+        self.setFixedHeight(36)
+        self.setMinimumWidth(118)
+        self.setMaximumWidth(188)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setStyleSheet(_GENRE_PILL_QSS)
+        self._chevron = make_icon("chevron-down", "#B8B2B5", 14)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
+        self._chevron.paint(
+            painter,
+            QRect(self.width() - 24, (self.height() - 14) // 2, 14, 14),
+        )
+        painter.end()
+
 
 def friendly(error: Exception) -> str:
     """A message that is safe and useful to show; never a stack trace."""
@@ -81,19 +144,16 @@ class BrowsePage(PageShell):
         from ui.components.form_fields import IconLineEdit
         from ui.components.icons import make_icon
 
-        self.search = IconLineEdit("search", f"Search {title.lower()}... (Ctrl+K)")
+        self.search = IconLineEdit("search", f"Search {title.lower()}...")
         self.search.setClearButtonEnabled(True)
-        self.search.setMaximumWidth(260)
-        self.search.setMinimumWidth(180)
+        self.search.setMinimumWidth(0)
+        self.search.setMinimumHeight(36)
+        self.search.setMaximumHeight(36)
 
         self._search_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
         self._search_shortcut.activated.connect(self.search.setFocus)
 
-        self.genre_filter = QComboBox()
-        self.genre_filter.setMinimumHeight(theme.CONTROL_HEIGHT)
-        self.genre_filter.setMinimumWidth(130)
-        self.genre_filter.setMaximumWidth(150)
-        self.genre_filter.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.genre_filter = NavGenreCombo()
         self.genre_filter.setToolTip("Filter by genre")
         self.genre_filter.addItem("All genres", None)
         for genre_id, name in GENRE_FILTERS[media_type]:
@@ -110,7 +170,7 @@ class BrowsePage(PageShell):
         self.toolbar_box = QWidget()
         toolbar = QHBoxLayout(self.toolbar_box)
         toolbar.setContentsMargins(0, 0, 0, 0)
-        toolbar.setSpacing(theme.SPACE_MD)
+        toolbar.setSpacing(theme.SPACE_SM)
         toolbar.addWidget(self.search)
         toolbar.addWidget(self.genre_filter)
 

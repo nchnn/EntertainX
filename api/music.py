@@ -171,9 +171,34 @@ class MusicClient:
             encrypted_media_url=enc_url,
         )
 
+    def _resolve_full_stream(self, title: str, artist: str) -> tuple[str, str, int] | None:
+        """Resolve full-length 320kbps JioSaavn stream for a given title and artist."""
+        try:
+            params = {
+                "__call": "search.getResults",
+                "_format": "json",
+                "_marker": "0",
+                "api_version": "4",
+                "ctx": "android",
+                "q": f"{title} {artist}",
+                "p": "1",
+                "n": "3",
+            }
+            url = f"{JIOSAAVN_API}?{urlencode(params)}"
+            resp = self._session.get(url, headers=JIO_HEADERS, timeout=(3, 6))
+            if resp.status_code == 200:
+                data = resp.json()
+                for item in data.get("results", []):
+                    track = self._parse_jiosaavn_track(item)
+                    if track and track.stream_url:
+                        return track.stream_url, track.quality, track.duration_ms
+        except Exception:
+            pass
+        return None
+
     # ── Search ──────────────────────────────────────────────────────────────
     def search(self, query: str, limit: int = 25) -> list[Track]:
-        """Search tracks across JioSaavn with Deezer fallback."""
+        """Search full-length tracks across JioSaavn."""
         query = query.strip()
         if not query:
             return []
@@ -192,7 +217,7 @@ class MusicClient:
                 "ctx": "android",
                 "q": query,
                 "p": "1",
-                "n": str(limit),
+                "n": str(max(limit, 25)),
             }
             url = f"{JIOSAAVN_API}?{urlencode(params)}"
             resp = self._session.get(url, headers=JIO_HEADERS, timeout=(4, 8))
@@ -205,7 +230,7 @@ class MusicClient:
         except Exception:
             pass
 
-        # If JioSaavn yielded few results, supplement with Deezer
+        # If JioSaavn yielded few results, discover via Deezer and resolve full 320k streams
         if len(tracks) < 5:
             try:
                 deezer_url = f"{DEEZER_API}/search?q={quote(query)}&limit={limit}"
@@ -213,22 +238,24 @@ class MusicClient:
                 if resp.status_code == 200:
                     data = resp.json()
                     for item in data.get("data", []):
-                        preview = item.get("preview")
-                        if not preview:
-                            continue
-                        tracks.append(
-                            Track(
-                                id=f"dz_{item.get('id')}",
-                                title=clean_html(item.get("title", "Untitled")),
-                                artist=clean_html(item.get("artist", {}).get("name", "Unknown Artist")),
-                                album=clean_html(item.get("album", {}).get("title", "")),
-                                duration_ms=int(item.get("duration", 0)) * 1000,
-                                artwork_url=item.get("album", {}).get("cover_big", "") or item.get("album", {}).get("cover_medium", ""),
-                                stream_url=preview,
-                                quality="PREVIEW",
-                                source="deezer",
+                        title = clean_html(item.get("title", ""))
+                        artist = clean_html(item.get("artist", {}).get("name", ""))
+                        resolved = self._resolve_full_stream(title, artist)
+                        if resolved:
+                            full_url, quality, duration_ms = resolved
+                            tracks.append(
+                                Track(
+                                    id=f"dz_{item.get('id')}",
+                                    title=title,
+                                    artist=artist,
+                                    album=clean_html(item.get("album", {}).get("title", "")),
+                                    duration_ms=duration_ms or (int(item.get("duration", 0)) * 1000),
+                                    artwork_url=item.get("album", {}).get("cover_big", "") or item.get("album", {}).get("cover_medium", ""),
+                                    stream_url=full_url,
+                                    quality=quality,
+                                    source="deezer_full",
+                                )
                             )
-                        )
             except Exception:
                 pass
 
@@ -238,50 +265,21 @@ class MusicClient:
 
     # ── Trending & Editorial Shelves ────────────────────────────────────────
     def get_trending(self, limit: int = 25) -> list[Track]:
-        """Fetch trending chart tracks."""
+        """Fetch trending chart tracks with guaranteed full-length streams."""
         cached = self._read_cache("charts", "trending", CHART_TTL)
         if isinstance(cached, list):
             return [Track(**item) for item in cached]
 
         tracks: list[Track] = []
-        # Try Deezer top charts for diverse global hits
-        try:
-            resp = self._session.get(f"{DEEZER_API}/chart/0/tracks?limit={limit}", timeout=(4, 8))
-            if resp.status_code == 200:
-                data = resp.json()
-                for item in data.get("data", []):
-                    title = clean_html(item.get("title", ""))
-                    artist = clean_html(item.get("artist", {}).get("name", ""))
-                    preview = item.get("preview", "")
+        for chart_query in ["Trending Hits 2026", "Global Top Hits", "Pop Hits", "OPM Hits"]:
+            jio_tracks = self.search(chart_query, limit=limit)
+            for t in jio_tracks:
+                if t.id not in {existing.id for existing in tracks}:
+                    tracks.append(t)
+            if len(tracks) >= limit:
+                break
 
-                    # Attempt to resolve full 320k JioSaavn stream for chart songs
-                    stream_url = preview
-                    quality = "PREVIEW"
-                    jio_matches = self.search(f"{title} {artist}", limit=1)
-                    if jio_matches and jio_matches[0].stream_url:
-                        stream_url = jio_matches[0].stream_url
-                        quality = jio_matches[0].quality
-
-                    tracks.append(
-                        Track(
-                            id=f"chart_{item.get('id')}",
-                            title=title,
-                            artist=artist,
-                            album=clean_html(item.get("album", {}).get("title", "")),
-                            duration_ms=int(item.get("duration", 0)) * 1000,
-                            artwork_url=item.get("album", {}).get("cover_big", "") or item.get("album", {}).get("cover_medium", ""),
-                            stream_url=stream_url,
-                            quality=quality,
-                            source="deezer_chart",
-                        )
-                    )
-        except Exception:
-            pass
-
-        # Fallback to local search if Deezer failed
-        if not tracks:
-            tracks = self.search("Top Hits 2026", limit=limit)
-
+        tracks = tracks[:limit]
         if tracks:
             self._write_cache("charts", "trending", [t.to_dict() for t in tracks])
         return tracks

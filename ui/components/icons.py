@@ -83,7 +83,10 @@ def _svg_source(slug: str) -> QByteArray:
     return QByteArray(path.read_bytes())
 
 
+@lru_cache(maxsize=512)
 def _paint(name: str, color: str, px: int, rotate: int = 0) -> QPixmap:
+    """Render one tinted SVG. Cached: a 921-card grid asks for the same glyph
+    hundreds of times, and re-parsing the SVG each time is what made it lag."""
     renderer = QSvgRenderer(_svg_source(_SLUGS[name]))
     pixmap = QPixmap(px, px)
     pixmap.fill(Qt.GlobalColor.transparent)

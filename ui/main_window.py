@@ -49,6 +49,7 @@ class MainWindow(QWidget):
         layout.addWidget(self._sidebar)
         layout.addWidget(self._content, 1)
 
+        self._content.category_changed.connect(self._sidebar.mark_active)
         self._sidebar.set_active(self._sidebar.active_category())
 
         # Track mouse globally over the app so child widgets never block
