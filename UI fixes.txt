@@ -1,0 +1,12 @@
+Do not use inline svg
+Update Sidebar and Top bar
+Use always the Logo as the title when hovering, not a plain text title
+Having landscape scroll in all have x-axis scrollable (shift + middle mouse) 
+Unmuted trailer first (user can have option to muted an unmute th hovered trailer..)
+Remove any scroll UI
+Increase the UI of the trailer
+Font families
+
+Filter choices in the tile(card modal) is not in English backdrop
+
+Fix the issue that have pause control in center.. play agad ang trailer while naka mute (habang nasa state na nagloloading ang hover state) at antayin ang ilang segundo para mawala yung pause control saka mag aappear yung mismong trailer na naka ummute na kapag nawala nayung pause control.. gusto ko rin idagdag ang fade in sounds para hindi magcause ng jumpscare sa naka full audio.. ang tricks na naisip ko dito ay naka mute(total zero volume) muna sa mismong desktop at paangat nang paangat ito kapag nag appear na ang trailer 

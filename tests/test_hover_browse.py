@@ -322,3 +322,53 @@ def test_title_detail_two_column_layout_and_metadata(app):
     assert "Drama" in detail.genres_label.text()
     assert "mentor changes everything" in detail.mood_label.text()
 
+
+def test_title_detail_toggles_top_nav_visibility_and_size(app):
+    from ui.content_area import TopNavBar
+
+    win = QWidget()
+    top_nav = TopNavBar(parent=win)
+    host = QWidget(win)
+    host.resize(1280, 800)
+    win.show()
+    detail = TitleDetailOverlay(host)
+    item = _make_item()
+
+    assert not top_nav.isHidden()
+    detail.open(item)
+    assert top_nav.isHidden()
+    assert detail.panel.width() <= 1140
+
+    # Ensure header and body both scroll inside the scroll area
+    assert detail.scroll.widget() is not None
+    assert detail.header.parent() is detail.scroll.widget()
+    detail.scroll.verticalScrollBar().setValue(100)
+
+    detail.close_overlay()
+    assert not top_nav.isHidden()
+
+    # Re-open cleanly with no deleted C++ object errors
+    detail.open(item)
+    assert detail.scroll.verticalScrollBar().value() == 0
+    detail.close_overlay()
+
+
+def test_trailer_delayed_reveal_and_audio_fade_html():
+    from ui.components.trailer.player import AUDIO_FADE_MS, REVEAL_DELAY_MS, TARGET_VOLUME
+
+    for html in (
+        embed_hover_html("dQw4w9WgXcQ", "https://example.com/logo.png", "Test", muted=False),
+        embed_modal_html("dQw4w9WgXcQ", "https://example.com/logo.png", "Test", muted=False),
+    ):
+        # Always starts muted + playsinline so browser autoplay works without jumpscare
+        assert "autoplay=1&mute=1" in html
+        assert "playsinline=1" in html
+        assert "isMuted = true;" in html
+        assert f"REVEAL_DELAY_MS = {REVEAL_DELAY_MS};" in html
+        assert f"AUDIO_FADE_MS = {AUDIO_FADE_MS};" in html
+        assert f"TARGET_VOLUME = {TARGET_VOLUME};" in html
+        assert "requestAnimationFrame" in html
+        assert "revealTrailer" in html
+        assert "cleanupTrailer" in html
+        assert "infoDelivery" in html
+

@@ -235,6 +235,8 @@ class BrowsePage(PageShell):
     def hideEvent(self, event) -> None:  # noqa: N802
         super().hideEvent(event)
         self.preview.dismiss()
+        if self.detail.isVisible():
+            self.detail.close_overlay()
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)

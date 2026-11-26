@@ -36,8 +36,8 @@ from ui.components.trailer.player import (
     render_trailer_html,
 )
 
-HEADER_H = 460
-PANEL_MAX_W = 880
+HEADER_H = 510
+PANEL_MAX_W = 1140
 
 
 def embed_modal_html(
@@ -151,8 +151,18 @@ class _Header(QWidget):
             return
         self.stop_countdown()
         logo_url = d.logo_url("w500") if d.logo_path else ""
+        backdrop_url = (
+            d.backdrop_url("w1280")
+            or (d.item.backdrop_url("w1280") if d.item else "")
+        )
         title = d.item.title if d.item else ""
-        spec = TrailerSpec(key=d.trailer_key, title=title, logo_url=logo_url, muted=False)
+        spec = TrailerSpec(
+            key=d.trailer_key,
+            title=title,
+            logo_url=logo_url,
+            backdrop_url=backdrop_url,
+            muted=False,
+        )
         self._player.setGeometry(0, 0, self.width(), HEADER_H)
         self._player.load(spec)
         self.update()
@@ -169,11 +179,11 @@ class _Header(QWidget):
         radius = float(theme.RADIUS_XL)
         # Round only the top corners: clip a taller rounded rect.
         painter.setClipPath(rounded_path(bounds.adjusted(0, 0, 0, radius * 2), radius))
-        painter.fillRect(bounds, QColor(theme.BG_ELEVATED))
+        painter.fillRect(bounds, QColor("#18181b"))
         if not self._is_playing:
             if self.pixmap is not None and not self.pixmap.isNull():
                 draw_cover(painter, bounds, self.pixmap, 0.5, 0.25)
-            fill_vertical_scrim(painter, bounds, 0.30, 1.0, theme.BG_CARD)
+            fill_vertical_scrim(painter, bounds, 0.30, 1.0, "#18181b")
 
             if self._countdown_active and self._countdown_progress > 0:
                 prog_w = bounds.width() * min(1.0, max(0.0, self._countdown_progress))
@@ -285,15 +295,31 @@ class TitleDetailOverlay(QWidget):
 
         buttons.addStretch(1)
         head.addLayout(buttons)
-        outer.addWidget(self.header)
-
-        # Body: scrolls if a long cast list or overview needs room.
+        
+        # Entire modal content: header and movie details scroll together.
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        scroll.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+
+        # Container for both the trailer header and movie details.
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        # Trailer header is now part of the scrollable content.
+        content_layout.addWidget(self.header)
+
+        # Movie details body.
         body = QWidget()
         body.setStyleSheet("background: transparent;")
+
 
         main_layout = QHBoxLayout(body)
         main_layout.setContentsMargins(36, 18, 36, 36)
@@ -388,11 +414,14 @@ class TitleDetailOverlay(QWidget):
         right_col.addStretch(1)
         main_layout.addLayout(right_col, 38)
 
-        scroll.setWidget(body)
-        outer.addWidget(scroll, 1)
+        content_layout.addWidget(body)
+        self.scroll = scroll
+        self.scroll.setWidget(content)
+        outer.addWidget(self.scroll, 1)
 
     # ── Opening and closing ─────────────────────────────────────────────────
     def open(self, item: MediaItem, auto_play: bool = False) -> None:
+        self.scroll.verticalScrollBar().setValue(0)
         self.item = item
         self.details = None
         self._auto_play = auto_play
@@ -433,6 +462,7 @@ class TitleDetailOverlay(QWidget):
             owner=self,
         )
 
+        self._set_top_nav_visible(False)
         self._fit()
         self.setGeometry(self._host.rect())
         self.raise_()
@@ -448,7 +478,29 @@ class TitleDetailOverlay(QWidget):
         self.hide()
         self.item = None
         self._auto_play = False
+        self._set_top_nav_visible(True)
         self.closed.emit()
+
+    def hideEvent(self, event) -> None:  # noqa: N802
+        super().hideEvent(event)
+        self._set_top_nav_visible(True)
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        if event is not None:
+            super().closeEvent(event)
+        self._set_top_nav_visible(True)
+
+    def _set_top_nav_visible(self, visible: bool) -> None:
+        host = getattr(self, "_host", None)
+        win = host.window() if host is not None else self.window()
+        if win is not None:
+            content = getattr(win, "content", None)
+            top_bar = getattr(content, "top_bar", None) if content is not None else None
+            if top_bar is None:
+                from ui.content_area import TopNavBar
+                top_bar = win.findChild(TopNavBar)
+            if top_bar is not None and top_bar.isVisible() != visible:
+                top_bar.setVisible(visible)
 
     def set_details(self, details: MediaDetails) -> None:
         if self.item is None or details.item.key != self.item.key:
@@ -578,7 +630,7 @@ class TitleDetailOverlay(QWidget):
     # ── Geometry ────────────────────────────────────────────────────────────
     def _fit(self) -> None:
         width = max(320, min(PANEL_MAX_W, self._host.width() - 48))
-        height = max(520, min(self._host.height() - 40, 840))
+        height = max(540, min(self._host.height() - 32, 920))
         self.panel.setFixedSize(width, height)
         self.panel.move(
             (self._host.width() - width) // 2,

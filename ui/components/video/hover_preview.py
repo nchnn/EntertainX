@@ -408,6 +408,7 @@ class HoverPreview(QWidget):
         self.show()
         self._animate_in(anchor)
         self._start_countdown()
+        self._start_trailer_playback()
         self.details_needed.emit(tile.item)
 
     def _maybe_hide(self) -> None:
@@ -596,6 +597,8 @@ class HoverPreview(QWidget):
         self._countdown.tick()
 
     def _start_trailer_playback(self) -> None:
+        if self._is_playing:
+            return
         if not self._player.available:
             return
         if self._details is not None and self._details.trailer_key:

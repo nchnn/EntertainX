@@ -21,6 +21,9 @@ from theme import theme_manager as theme
 BASE_URL = "https://entertainx.local/"
 COUNTDOWN_MS = 600
 COUNTDOWN_STEP_MS = 30
+REVEAL_DELAY_MS = 3500 
+AUDIO_FADE_MS = 2500
+TARGET_VOLUME = 100
 
 PlayerMode = Literal["hover", "modal", "simple"]
 _KEY_PATTERN = re.compile(r"^[A-Za-z0-9_-]{6,20}$")
@@ -205,18 +208,33 @@ class CountdownController(QObject):
         return self._progress
 
     def start(self) -> None:
+        self.stop()
+
         self._active = True
         self._remaining_ms = self._duration_ms
         self._progress = 0.0
-        self._timer.start()
+
+        try:
+            if self._timer is not None:
+                self._timer.start()
+        except RuntimeError:
+            pass
         self.progressed.emit(0.0)
 
     def stop(self) -> None:
         was_active = self._active or self._progress > 0.0
-        self._timer.stop()
+
         self._active = False
         self._remaining_ms = self._duration_ms
         self._progress = 0.0
+
+        # Safely stop the timer if its C++ object still exists.
+        try:
+            if self._timer is not None:
+                self._timer.stop()
+        except RuntimeError:
+            pass
+
         if was_active:
             self.progressed.emit(0.0)
 
@@ -229,7 +247,11 @@ class CountdownController(QObject):
             1.0 - max(0, self._remaining_ms) / float(self._duration_ms),
         )
         if self._remaining_ms <= 0:
-            self._timer.stop()
+            try:
+                if self._timer is not None:
+                    self._timer.stop()
+            except RuntimeError:
+                pass
             self._active = False
             self._progress = 1.0
             self.progressed.emit(1.0)
@@ -258,12 +280,13 @@ def _youtube_embed_url(key: str, *, muted: bool, interactive: bool) -> str:
             f"https://www.youtube-nocookie.com/embed/{key}"
             "?autoplay=1&rel=0&modestbranding=1&playsinline=1"
         )
-    mute_flag = 1 if muted else 0
+    # Always start muted + playsinline so browser autoplay is allowed;
+    # JS unmutes and fades volume in after REVEAL_DELAY_MS.
     return (
         f"https://www.youtube-nocookie.com/embed/{key}"
-        f"?autoplay=1&mute={mute_flag}&enablejsapi=1&origin=https://entertainx.local"
+        "?autoplay=1&mute=1&enablejsapi=1&origin=https://entertainx.local"
         "&controls=0&color=white&modestbranding=0&rel=0&playsinline=1&loop=1"
-        "&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&start=20&vq=hd1080"
+        "&disablekb=1&fs=0&iv_load_policy=3&cc_load_policy=0&start=0&vq=hd1080"
     )
 
 
@@ -289,6 +312,18 @@ def _shared_bridge_js(*, start_ring_on_play: bool, loop_on_end: bool) -> str:
         else "sendAction('ended');"
     )
     return f"""
+const REVEAL_DELAY_MS = {REVEAL_DELAY_MS};
+const AUDIO_FADE_MS = {AUDIO_FADE_MS};
+const TARGET_VOLUME = {TARGET_VOLUME};
+
+let isRevealed = false;
+let userInteractedAudio = false;
+let revealTimer = null;
+let fadeRafId = null;
+let audioVerifyTimer = null;
+let isCleanedUp = false;
+let listeningInterval = null;
+
 function onLogoLoaded() {{
   const f = document.getElementById('title-fallback');
   if (f) f.style.display = 'none';
@@ -315,23 +350,153 @@ function sendAction(name) {{
     window.parent.postMessage({{ type: 'entertainx_action', action: name }}, '*');
   }}
 }}
+function updateAudioIconUI(muted) {{
+  isMuted = !!muted;
+  const btn = document.getElementById('audio-toggle') || document.getElementById('mute-btn');
+  if (btn) {{
+    btn.innerHTML = isMuted ? svgMutedStr : svgSoundStr;
+    btn.setAttribute('title', isMuted ? 'Unmute trailer' : 'Mute trailer');
+  }}
+}}
+function cancelAudioFade() {{
+  if (fadeRafId !== null) {{
+    cancelAnimationFrame(fadeRafId);
+    fadeRafId = null;
+  }}
+  if (audioVerifyTimer !== null) {{
+    clearTimeout(audioVerifyTimer);
+    audioVerifyTimer = null;
+  }}
+}}
+function startAudioFadeIn() {{
+  cancelAudioFade();
+  if (isCleanedUp || userInteractedAudio) return;
+  try {{
+    postPlayerCmd('setVolume', [0]);
+    postPlayerCmd('unMute');
+  }} catch (e) {{
+    updateAudioIconUI(true);
+    return;
+  }}
+  updateAudioIconUI(false);
+  let lastSentVol = -1;
+  const startTime = performance.now();
+  function step(now) {{
+    if (isCleanedUp || userInteractedAudio || isMuted) {{
+      fadeRafId = null;
+      return;
+    }}
+    const elapsed = now - startTime;
+    const t = Math.min(1, elapsed / Math.max(1, AUDIO_FADE_MS));
+    const eased = 1 - Math.pow(1 - t, 3);
+    const vol = Math.round(eased * TARGET_VOLUME);
+    if (vol !== lastSentVol) {{
+      lastSentVol = vol;
+      postPlayerCmd('setVolume', [vol]);
+    }}
+    if (t < 1) {{
+      fadeRafId = requestAnimationFrame(step);
+    }} else {{
+      fadeRafId = null;
+    }}
+  }}
+  fadeRafId = requestAnimationFrame(step);
+
+  // Verify browser did not block unmute without user gesture.
+  audioVerifyTimer = setTimeout(() => {{
+    audioVerifyTimer = null;
+    if (!isCleanedUp && !userInteractedAudio && isMuted) {{
+      cancelAudioFade();
+      postPlayerCmd('setVolume', [0]);
+    }}
+  }}, 600);
+}}
+function revealTrailer() {{
+  revealTimer = null;
+  if (isCleanedUp || isRevealed) return;
+  isRevealed = true;
+  const frame = document.getElementById('yt-player');
+  if (frame) frame.style.opacity = '1';
+  const backdrop = document.getElementById('backdrop');
+  if (backdrop) backdrop.style.opacity = '0';
+  if (!userInteractedAudio && autoUnmuteOnReveal) {{
+    startAudioFadeIn();
+  }}
+}}
+function cleanupTrailer() {{
+  isCleanedUp = true;
+  if (revealTimer !== null) {{
+    clearTimeout(revealTimer);
+    revealTimer = null;
+  }}
+  if (listeningInterval !== null) {{
+    clearInterval(listeningInterval);
+    listeningInterval = null;
+  }}
+  cancelAudioFade();
+  try {{
+    postPlayerCmd('mute');
+    postPlayerCmd('setVolume', [0]);
+    postPlayerCmd('pauseVideo');
+  }} catch (e) {{}}
+  isRevealed = false;
+  const frame = document.getElementById('yt-player');
+  if (frame) frame.style.opacity = '0';
+  const backdrop = document.getElementById('backdrop');
+  if (backdrop) backdrop.style.opacity = '1';
+  updateAudioIconUI(true);
+}}
+window.addEventListener('pagehide', cleanupTrailer);
+window.addEventListener('beforeunload', cleanupTrailer);
+
 window.addEventListener('message', (event) => {{
+  if (isCleanedUp) return;
   let data = event.data;
   if (typeof data === 'string') {{
     try {{ data = JSON.parse(data); }} catch (e) {{ return; }}
   }}
+  if (data && data.event === 'infoDelivery' && data.info && typeof data.info === 'object') {{
+    if (typeof data.info.muted === 'boolean') {{
+      const realMuted = data.info.muted || (data.info.volume === 0 && !fadeRafId);
+      if (!isRevealed) {{
+        // Keep silent and muted icon during loading delay.
+        if (!data.info.muted) postPlayerCmd('mute');
+        updateAudioIconUI(true);
+      }} else if (realMuted !== isMuted) {{
+        if (realMuted && fadeRafId !== null && !userInteractedAudio) {{
+          // Browser blocked unmute without user gesture: fail gracefully.
+          cancelAudioFade();
+          postPlayerCmd('setVolume', [0]);
+        }}
+        updateAudioIconUI(realMuted);
+        sendAction(realMuted ? 'muted' : 'unmuted');
+      }}
+    }}
+  }}
   if (data && (data.event === 'onStateChange' || data.event === 'infoDelivery')) {{
     const state = data.info?.playerState ?? data.info;
     if (state === 1) {{
-      const frame = document.getElementById('yt-player');
-      if (frame) frame.style.opacity = '1';
       postPlayerCmd('unloadModule', ['captions']);
       postPlayerCmd('unloadModule', ['cc']);
-      if (!isMuted) {{
-        postPlayerCmd('unMute');
-        postPlayerCmd('setVolume', [100]);
+      if (!isRevealed) {{
+        // Stay hidden and silent behind backdrop until REVEAL_DELAY_MS elapses.
+        postPlayerCmd('mute');
+        postPlayerCmd('setVolume', [0]);
+        updateAudioIconUI(true);
+        if (revealTimer === null) {{
+          revealTimer = setTimeout(revealTrailer, REVEAL_DELAY_MS);
+        }}
+      }} else {{
+        const frame = document.getElementById('yt-player');
+        if (frame) frame.style.opacity = '1';
       }}
       {ring_hook}
+    }} else if (state === 2 || state === 3) {{
+      if (!isRevealed) {{
+        // Never show YouTube center pause/loading icon before reveal.
+        const frame = document.getElementById('yt-player');
+        if (frame) frame.style.opacity = '0';
+      }}
     }} else if (state === 0) {{
       {loop_hook}
     }}
@@ -340,12 +505,12 @@ window.addEventListener('message', (event) => {{
     sendAction('error');
   }}
 }});
-setInterval(() => {{
+listeningInterval = setInterval(() => {{
   const frame = document.getElementById('yt-player');
   if (frame && frame.contentWindow) {{
     frame.contentWindow.postMessage(JSON.stringify({{ event: 'listening' }}), '*');
   }}
-}}, 500);
+}}, 250);
 """
 
 
@@ -383,7 +548,7 @@ def _render_hover_html(spec: TrailerSpec) -> str:
     bg_card_rgb = f"{r}, {g}, {b}"
     primary_color = theme.PRIMARY
     elevated_color = theme.BG_ELEVATED
-    initial_audio_svg = SVG_MUTED if spec.muted else SVG_SOUND
+    initial_audio_svg = SVG_MUTED
 
     return f"""<!doctype html>
 <html lang="en">
@@ -409,7 +574,7 @@ html, body {{
 }}
 .backdrop-img {{
   position: absolute; inset: 0; width: 100%; height: 100%;
-  object-fit: cover; transition: opacity 0.4s ease; z-index: 1;
+  object-fit: cover; transition: opacity 0.4s ease; z-index: 3;
 }}
 .iframe-wrapper {{
   position: absolute; inset: 0; width: 100%; height: 100%;
@@ -434,10 +599,10 @@ html, body {{
         ),
         rgba(24, 24, 27, 0.16);
     pointer-events: none;
-    z-index: 3;
+    z-index: 4;
 }}
 .click-shield {{
-  position: absolute; inset: 0; z-index: 4; cursor: pointer; pointer-events: auto; background: transparent;
+  position: absolute; inset: 0; z-index: 5; cursor: pointer; pointer-events: auto; background: transparent;
 }}
 .media-header {{
   position: absolute; top: 12px; left: 14px; right: 14px;
@@ -500,10 +665,11 @@ html, body {{
   </div>
 </div>
 <script>
-let isMuted = {'true' if spec.muted else 'false'};
+let isMuted = true;
+let autoUnmuteOnReveal = {'false' if spec.muted else 'true'};
 let countdownActive = false;
 let countdownTimer = null;
-const COUNTDOWN_TOTAL_MS = 6000;
+const COUNTDOWN_TOTAL_MS = {REVEAL_DELAY_MS};
 let countdownRemainingMs = COUNTDOWN_TOTAL_MS;
 const TICK_INTERVAL_MS = 50;
 const CIRCLE_CIRCUMFERENCE = 94.2;
@@ -517,6 +683,7 @@ const svgSoundStr = `{SVG_SOUND}`;
 {_shared_bridge_js(start_ring_on_play=True, loop_on_end=True)}
 
 function startCountdownRing() {{
+  if (isRevealed || countdownActive) return;
   countdownActive = true;
   countdownRemainingMs = COUNTDOWN_TOTAL_MS;
   if (countdownSvg) countdownSvg.style.opacity = '1';
@@ -524,7 +691,7 @@ function startCountdownRing() {{
   countdownTimer = setInterval(() => {{
     countdownRemainingMs -= TICK_INTERVAL_MS;
     if (countdownRemainingMs <= 0) {{
-      stopCountdownRing(true);
+      stopCountdownRing(false);
     }} else {{
       updateRingUI();
     }}
@@ -548,24 +715,26 @@ function stopCountdownRing(autoUnmute = false) {{
 }}
 
 function handleAudioToggle() {{
+  userInteractedAudio = true;
+  cancelAudioFade();
   if (countdownActive) stopCountdownRing(false);
   setMuteState(!isMuted, true);
 }}
 
 function setMuteState(muted, notifyHost = false) {{
-  isMuted = !!muted;
-  if (isMuted) {{
+  cancelAudioFade();
+  const targetMuted = !!muted;
+  if (targetMuted) {{
     postPlayerCmd('mute');
-    if (audioToggle) {{
-      audioToggle.innerHTML = svgMutedStr;
-      audioToggle.setAttribute('title', 'Unmute trailer');
-    }}
+    postPlayerCmd('setVolume', [0]);
+    updateAudioIconUI(true);
   }} else {{
-    postPlayerCmd('unMute');
-    postPlayerCmd('setVolume', [100]);
-    if (audioToggle) {{
-      audioToggle.innerHTML = svgSoundStr;
-      audioToggle.setAttribute('title', 'Mute trailer');
+    try {{
+      postPlayerCmd('unMute');
+      postPlayerCmd('setVolume', [TARGET_VOLUME]);
+      updateAudioIconUI(false);
+    }} catch (e) {{
+      updateAudioIconUI(true);
     }}
   }}
   if (notifyHost) sendAction(isMuted ? 'muted' : 'unmuted');
@@ -581,8 +750,14 @@ function toggleMute() {{
 
 def _render_modal_html(spec: TrailerSpec) -> str:
     embed_url = _youtube_embed_url(spec.key, muted=spec.muted, interactive=False)
+    safe_backdrop = html_lib.escape(spec.backdrop_url, quote=True) if spec.backdrop_url else ""
+    backdrop_markup = (
+        f'<img id="backdrop" class="backdrop-img" src="{safe_backdrop}" alt="" onerror="this.style.opacity=\'0\';">'
+        if safe_backdrop
+        else ""
+    )
     logo_markup = _logo_markup(spec.logo_url, spec.title, "logo-text")
-    initial_icon = SVG_MUTED if spec.muted else SVG_SOUND
+    initial_icon = SVG_MUTED
     initial_list_svg = SVG_CHECK if spec.in_watchlist else SVG_PLUS
 
     return f"""<!doctype html>
@@ -606,7 +781,11 @@ html, body {{
 iframe {{
   position: absolute; top: 50%; left: 50%; width: 100%; height: 180%;
   transform: translate(-50%, -50%) scale(1.35);
-  border: 0; opacity: 0; transition: opacity 0.45s ease-out; pointer-events: none;
+  border: 0; opacity: 0; transition: opacity 0.45s ease-out; pointer-events: none; z-index: 2;
+}}
+.backdrop-img {{
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; transition: opacity 0.45s ease; z-index: 3;
 }}
 
 .modal-scrim {{
@@ -674,6 +853,7 @@ iframe {{
 </head>
 <body>
 <div id="modal-player-wrap">
+  {backdrop_markup}
   <iframe id="yt-player"
     src="{embed_url}"
     referrerpolicy="strict-origin-when-cross-origin"
@@ -707,28 +887,38 @@ iframe {{
   </div>
 </div>
 <script>
-let isMuted = {'true' if spec.muted else 'false'};
+let isMuted = true;
+let autoUnmuteOnReveal = {'false' if spec.muted else 'true'};
 let inWatchlist = {'true' if spec.in_watchlist else 'false'};
-const svgMuted = `{SVG_MUTED}`;
-const svgSound = `{SVG_SOUND}`;
+const svgMutedStr = `{SVG_MUTED}`;
+const svgSoundStr = `{SVG_SOUND}`;
 const svgPlus = `{SVG_PLUS}`;
 const svgCheck = `{SVG_CHECK}`;
 
 {_shared_bridge_js(start_ring_on_play=False, loop_on_end=True)}
 
 function setMuteState(muted, notifyHost = false) {{
-  isMuted = !!muted;
-  postPlayerCmd(isMuted ? 'mute' : 'unMute', []);
-  if (!isMuted) postPlayerCmd('setVolume', [100]);
-  const btn = document.getElementById('mute-btn');
-  if (btn) {{
-    btn.innerHTML = isMuted ? svgMuted : svgSound;
-    btn.setAttribute('title', isMuted ? 'Unmute' : 'Mute');
+  cancelAudioFade();
+  const targetMuted = !!muted;
+  if (targetMuted) {{
+    postPlayerCmd('mute', []);
+    postPlayerCmd('setVolume', [0]);
+    updateAudioIconUI(true);
+  }} else {{
+    try {{
+      postPlayerCmd('unMute', []);
+      postPlayerCmd('setVolume', [TARGET_VOLUME]);
+      updateAudioIconUI(false);
+    }} catch (e) {{
+      updateAudioIconUI(true);
+    }}
   }}
   if (notifyHost) sendAction(isMuted ? 'muted' : 'unmuted');
 }}
 
 function toggleMute() {{
+  userInteractedAudio = true;
+  cancelAudioFade();
   setMuteState(!isMuted, true);
 }}
 
@@ -849,6 +1039,10 @@ class TrailerPlayer(QWidget):
         was_playing = self._is_playing
         self._is_playing = False
         if self._viewport is not None:
+            if was_playing:
+                self._viewport.run_javascript(
+                    "if (typeof cleanupTrailer === 'function') cleanupTrailer();"
+                )
             self._viewport.clear()
             self._viewport.set_visible(False)
         self.hide()

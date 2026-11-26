@@ -896,8 +896,8 @@ QLabel[role="sectionTitle"] {
     font-weight: 600;
 }
 QFrame[role="detailPanel"] {
-    background-color: %(bg_card)s;
-    border: 1px solid %(border)s;
+    background-color: #18181b;
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: %(radius_xl)spx;
 }
 QFrame[role="detailPanel"] QScrollArea,
