@@ -242,6 +242,7 @@ class FramelessWindow(QMainWindow):
         super().setCentralWidget(self._root)
 
         self._content: QWidget | None = None
+        self._chrome_locked = False
 
         self._titlebar.minimize_requested.connect(self.showMinimized)
         self._titlebar.maximize_requested.connect(self.toggle_maximize)
@@ -254,6 +255,8 @@ class FramelessWindow(QMainWindow):
 
     def eventFilter(self, watched, event: QEvent) -> bool:
         if event.type() == QEvent.Type.MouseMove and self.isVisible():
+            if self._chrome_locked:
+                return False
             local_pos = self.mapFromGlobal(QCursor.pos())
             if 0 <= local_pos.x() <= self.width():
                 if 0 <= local_pos.y() <= 14:
@@ -265,6 +268,12 @@ class FramelessWindow(QMainWindow):
                 ):
                     self._titlebar.collapse()
         return False
+
+    def set_chrome_locked(self, locked: bool) -> None:
+        """Keep the title bar hidden while the video player owns the window."""
+        self._chrome_locked = bool(locked)
+        if self._chrome_locked:
+            self._titlebar.collapse()
 
     # ── Content ─────────────────────────────────────────────────────────────
     @property

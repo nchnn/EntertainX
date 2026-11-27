@@ -7,7 +7,7 @@ network. Shelves load lazily as they near the viewport.
 
 from __future__ import annotations
 
-from PySide6.QtCore import QPoint, QRect, Qt, QTimer
+from PySide6.QtCore import QPoint, QRect, Qt, QTimer, Signal
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
     QApplication,
@@ -39,11 +39,6 @@ from ui.components.layout import EmptyState, InlineBanner
 from ui.components.video.tile_grid import TileGrid
 from ui.components.video.title_detail import TitleDetailOverlay
 from ui.components.video.top10_panel import Top10Panel
-from ui.components.video_player_view import (
-    VideoPlayerView,
-    build_payload,
-    configured_servers,
-)
 from ui.pages.page_shell import PageShell
 
 EAGER_ROWS = 3  # shelves fetched immediately; the rest wait until scrolled near
@@ -122,6 +117,9 @@ def friendly(error: Exception) -> str:
 
 
 class BrowsePage(PageShell):
+    #: (MediaItem, MediaDetails) — the shell opens the full-screen player.
+    playback_requested = Signal(object, object)
+
     def __init__(
         self,
         media_type: str,
@@ -241,11 +239,6 @@ class BrowsePage(PageShell):
         self.preview = HoverPreview(self, store)
         self.detail = TitleDetailOverlay(self, store)
 
-        # Inline player: covers this page while a title plays; the back arrow returns.
-        self.player_view = VideoPlayerView(self)
-        self.player_view.hide()
-        self.player_view.back_requested.connect(self._close_player)
-
         self._wire()
 
     # ── Wiring ──────────────────────────────────────────────────────────────
@@ -307,11 +300,9 @@ class BrowsePage(PageShell):
         self.preview.dismiss()
         if self.detail.isVisible():
             self.detail.close_overlay()
-        self._close_player()
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
-        self.player_view.setGeometry(self.rect())
         self.preview.dismiss()
         if self._started:
             QTimer.singleShot(0, self._request_visible_rows)
@@ -528,58 +519,14 @@ class BrowsePage(PageShell):
 
         self._fetch_details(item, on_done=_apply_preview)
 
-    def _close_player(self) -> None:
-        if self.player_view.isVisible():
-            self.player_view.stop()
-            self.player_view.hide()
-
-    def _open_player(self, item: MediaItem, details: MediaDetails, servers: list[dict]) -> None:
-        def _show(episodes: list[dict]) -> None:
-            self.player_view.setGeometry(self.rect())
-            self.player_view.play(build_payload(item, details, servers, episodes))
-            self.player_view.show()
-            self.player_view.raise_()
-
-        if item.media_type != "tv":
-            _show([])
-            return
-
-        def _episodes(rows) -> None:
-            _show([{"season": 1, "episode": ep.number, "title": ep.name} for ep in rows])
-
-        run_async(
-            self.provider.episodes,
-            item.id,
-            1,
-            on_done=_episodes,
-            on_error=lambda _error: _show([]),
-            owner=self,
-        )
-
     def _play(self, item: MediaItem) -> None:
+        """Hand the title to the full-window player, loading details first."""
         self.preview.dismiss()
-        servers = configured_servers()
-        if servers:
-            if self.detail.isVisible():
-                self.detail.close_overlay()
-            self._fetch_details(
-                item,
-                on_done=lambda details: self._open_player(item, details, servers),
-                on_error=lambda error: self.banner.show_message(friendly(error)),
-            )
-            return
-        # No streaming servers configured: keep the existing trailer behaviour.
-        self.detail.open(item, auto_play=True)
-        cached = self._details.get(item.key)
-        if cached is not None:
-            self.detail.set_details(cached)
-            return
         self.banner.clear()
-
-        def _on_ready(details: MediaDetails) -> None:
-            self.detail.set_details(details)
-
-        def _on_fail(error: Exception) -> None:
-            self.detail.set_error(friendly(error))
-
-        self._fetch_details(item, on_done=_on_ready, on_error=_on_fail)
+        if self.detail.isVisible():
+            self.detail.close_overlay()
+        self._fetch_details(
+            item,
+            on_done=lambda details: self.playback_requested.emit(item, details),
+            on_error=lambda error: self.banner.show_message(friendly(error)),
+        )

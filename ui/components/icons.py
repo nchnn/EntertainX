@@ -68,6 +68,14 @@ _SLUGS = {
     "heart": "heart",
     "mic": "mic-2",
     "queue": "list-music",
+    "back": "arrow-left",
+    "rewind": "rotate-ccw",
+    "forward": "rotate-cw",
+    "captions": "captions",
+    "episodes": "list-video",
+    "server": "server",
+    "tv": "tv",
+    "pip": "picture-in-picture-2",
 }
 
 

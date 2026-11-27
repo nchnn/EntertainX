@@ -681,6 +681,8 @@ class TopNavBar(QWidget):
 
 class ContentArea(QWidget):
     category_changed = Signal(str)
+    #: (MediaItem, MediaDetails) — forwarded from a browse page's Play button.
+    playback_requested = Signal(object, object)
 
     def __init__(
         self,
@@ -752,6 +754,9 @@ class ContentArea(QWidget):
             for tab_label, widget in tabs:
                 idx = self._stack.addWidget(widget)
                 self._page_index[cat][tab_label] = idx
+                signal = getattr(widget, "playback_requested", None)
+                if signal is not None:
+                    signal.connect(self.playback_requested)
 
         movies_page = self._categories["Video"][0][1]
         tvshows_page = self._categories["Video"][1][1]

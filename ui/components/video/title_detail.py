@@ -622,10 +622,9 @@ class TitleDetailOverlay(QWidget):
         self.header.update()
 
     def _on_play(self) -> None:
-        if self.details and self.details.trailer_key:
-            self.header.start_trailer(self.details)
-        else:
-            self._auto_play = True
+        """Hand the title to the full player; the trailer stays a hover preview."""
+        if self.item is not None:
+            self.play_requested.emit(self.item)
 
     # ── Geometry ────────────────────────────────────────────────────────────
     def _fit(self) -> None:
